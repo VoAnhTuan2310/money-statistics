@@ -15,7 +15,9 @@ export default function BudgetSettings({
   onAddRecurring,
   onDeleteRecurring,
   activeUser,
-  onClearUserData
+  onClearUserData,
+  geminiKey,
+  onSaveApiKey
 }) {
   const [activeSubTab, setActiveSubTab] = useState('budget'); // 'budget', 'categories', 'recurring', 'security'
   
@@ -42,6 +44,80 @@ export default function BudgetSettings({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [secMessage, setSecMessage] = useState(null);
+
+  // Gemini API Key State
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [apiKeyMessage, setApiKeyMessage] = useState('');
+  const [isTestingKey, setIsTestingKey] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+
+  React.useEffect(() => {
+    setApiKeyInput(geminiKey || '');
+  }, [geminiKey]);
+
+  const handleApiKeySubmit = (e) => {
+    e.preventDefault();
+    onSaveApiKey(apiKeyInput.trim());
+    setApiKeyMessage('Đã lưu khóa API Gemini thành công!');
+    setTimeout(() => setApiKeyMessage(''), 3000);
+  };
+
+  const handleTestApiKey = async () => {
+    const key = apiKeyInput.trim();
+    if (!key) {
+      setTestResult({ success: false, message: '⚠️ Vui lòng nhập khóa API trước khi kiểm tra!' });
+      return;
+    }
+    setIsTestingKey(true);
+    setTestResult(null);
+
+    try {
+      // 1. Fetch available models for this specific API key
+      const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`;
+      const listResponse = await fetch(listUrl);
+      const listData = await listResponse.json();
+
+      if (!listResponse.ok) {
+        throw new Error(listData.error?.message || 'Không thể truy cập API Google Gemini. Vui lòng kiểm tra lại khóa.');
+      }
+
+      if (!listData.models || listData.models.length === 0) {
+        throw new Error('Dự án Google Cloud của khóa này chưa kích hoạt hoặc không có mô hình khả dụng nào.');
+      }
+
+      const modelNames = listData.models.map(m => m.name.replace('models/', ''));
+      // Prefer standard flash models, fallback to the first model in the list
+      const testModel = modelNames.find(name => name.includes('flash')) || modelNames[0];
+
+      // 2. Perform a test generation call using the selected model
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${testModel}:generateContent?key=${key}`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: 'Kiểm tra' }] }]
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error?.message || `Lỗi khi gọi mô hình ${testModel}`);
+      }
+
+      setTestResult({
+        success: true,
+        message: `✅ Kết nối thành công! Khóa hoạt động tốt với mô hình "${testModel}".`
+      });
+    } catch (err) {
+      console.error(err);
+      setTestResult({ success: false, message: `❌ Kết nối thất bại! Chi tiết: ${err.message}` });
+    } finally {
+      setIsTestingKey(false);
+    }
+  };
 
   // Handle Budget Save
   const handleBudgetSubmit = (e) => {
@@ -527,6 +603,77 @@ export default function BudgetSettings({
                   Tài khoản của bạn được bảo mật an toàn hoàn toàn offline trên trình duyệt của máy tính này. Chúng tôi khuyến nghị bạn nên cấu hình mật khẩu riêng tư để bảo vệ dữ liệu.
                 </p>
               </div>
+
+              {/* Gemini API Key configuration */}
+              <form onSubmit={handleApiKeySubmit} className="space-y-4 max-w-md border-b border-slate-900 pb-6 mb-6">
+                <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5 font-heading">
+                  <Lock className="w-4 h-4 text-purple-400" /> Tích hợp Trợ lý AI (Gemini API Key)
+                </h4>
+                
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-450 uppercase tracking-wider mb-1">Khóa API Gemini</label>
+                  <div className="relative">
+                    <input
+                      type={showApiKey ? "text" : "password"}
+                      value={apiKeyInput}
+                      onChange={(e) => setApiKeyInput(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl glass-input text-xs font-mono font-medium"
+                      placeholder="Nhập AIzaSy... từ Google AI Studio"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKey(!showApiKey)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-purple-400 p-1"
+                    >
+                      {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
+                    Khóa API này sẽ giúp kích hoạt trang **Trợ lý AI**. Bạn có thể lấy khóa miễn phí tại{' '}
+                    <a
+                      href="https://aistudio.google.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-purple-400 underline hover:text-purple-300 font-semibold"
+                    >
+                      Google AI Studio
+                    </a>.
+                  </p>
+                </div>
+
+                {apiKeyMessage && (
+                  <div className="p-3 rounded-xl text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    {apiKeyMessage}
+                  </div>
+                )}
+
+                {testResult && (
+                  <div className={`p-3 rounded-xl text-xs font-semibold border ${
+                    testResult.success 
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                      : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                  }`}>
+                    {testResult.message}
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    className="flex-1 py-2.5 rounded-xl bg-purple-650 hover:bg-purple-550 text-white font-semibold transition cursor-pointer text-xs btn-click-effect shimmer-btn"
+                  >
+                    Lưu Khóa API Gemini
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleTestApiKey}
+                    disabled={isTestingKey}
+                    className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-850 text-slate-350 border border-slate-800 hover:border-slate-700 font-semibold transition cursor-pointer text-xs disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                  >
+                    {isTestingKey ? 'Đang thử...' : 'Thử kết nối'}
+                  </button>
+                </div>
+              </form>
 
               {/* Password change form */}
               <form onSubmit={handlePasswordSubmit} className="space-y-4 max-w-md">

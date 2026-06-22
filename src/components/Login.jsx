@@ -203,7 +203,7 @@ export default function Login({ onLoginSuccess }) {
           <div className="w-16 h-16 bg-gradient-to-tr from-purple-600 to-indigo-600 rounded-2xl shadow-xl shadow-purple-500/20 flex items-center justify-center mx-auto mb-2 text-white">
             {isRegistering ? <UserPlus className="w-8 h-8" /> : <LogIn className="w-8 h-8" />}
           </div>
-          <h1 className="text-3xl font-black font-heading bg-gradient-to-r from-white via-slate-100 to-purple-400 bg-clip-text text-transparent">FinTrack</h1>
+          <h1 className="text-3xl font-black font-heading bg-gradient-to-r from-white via-slate-100 to-purple-400 bg-clip-text text-transparent">AnhTuan</h1>
           <p className="text-xs text-slate-400 leading-relaxed max-w-[280px] mx-auto">
             {isRegistering 
               ? 'Tạo tài khoản mới để bắt đầu theo dõi thu chi & tiết kiệm' 

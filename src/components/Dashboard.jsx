@@ -304,8 +304,8 @@ export default function Dashboard({ transactions, budget, savingsPots, onNavigat
 
       {/* 3. Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Trend Charts Grid (takes 2 cols of 3) */}
-        <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Trend Charts Grid (takes full 3 cols of 3) */}
+        <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Income Trend Chart */}
           <div className="glass-panel p-5 rounded-2xl shadow-xl space-y-4">
             <h3 className="text-sm font-bold text-emerald-400 flex items-center gap-1.5 font-heading">
@@ -381,56 +381,6 @@ export default function Dashboard({ transactions, budget, savingsPots, onNavigat
           </div>
         </div>
 
-        {/* Pie Chart - Expenses Breakdown */}
-        <div className="glass-panel p-6 rounded-2xl shadow-xl flex flex-col justify-between space-y-4">
-          <h3 className="text-lg font-bold text-slate-100 font-heading">Cơ Cấu Chi Tiêu</h3>
-          
-          {pieChartData.length > 0 ? (
-            <>
-              <div className="h-56 w-full flex items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={pieChartData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={3}
-                      dataKey="value"
-                    >
-                      {pieChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
-                      formatter={(value) => [formatVND(value), '']}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Custom Legend */}
-              <div className="overflow-y-auto max-h-32 text-xs space-y-1.5 pr-2">
-                {pieChartData.map((entry, index) => (
-                  <div key={entry.name} className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }}></span>
-                      <span className="text-slate-300 line-clamp-1">{entry.name}</span>
-                    </div>
-                    <span className="font-semibold text-slate-400">{formatVND(entry.value)}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-500 py-6">
-              <HelpCircle className="w-10 h-10 text-slate-700 mb-2" />
-              <p className="text-sm">Chưa có giao dịch chi tiêu nào trong tháng này để phân tích.</p>
-            </div>
-          )}
-        </div>
       </div>
 
       {/* 3.5. Monthly Comparison Bar Chart Row */}

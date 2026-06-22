@@ -3,7 +3,8 @@ const KEYS = {
   TRANSACTIONS: 'fintrack_transactions',
   BUDGET: 'fintrack_budget',
   SAVINGS_POTS: 'fintrack_savings_pots',
-  USERS: 'fintrack_users'
+  USERS: 'fintrack_users',
+  GEMINI_API_KEY: 'fintrack_gemini_api_key'
 };
 
 // Initial Default Values
@@ -466,7 +467,7 @@ export const exportData = () => {
   const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(data, null, 2))}`;
   const downloadAnchor = document.createElement('a');
   downloadAnchor.setAttribute('href', jsonString);
-  downloadAnchor.setAttribute('download', `fintrack_data_${getActiveUser() || 'guest'}_${new Date().toISOString().split('T')[0]}.json`);
+  downloadAnchor.setAttribute('download', `anhtuan_data_${getActiveUser() || 'guest'}_${new Date().toISOString().split('T')[0]}.json`);
   document.body.appendChild(downloadAnchor);
   downloadAnchor.click();
   downloadAnchor.remove();
@@ -507,4 +508,22 @@ export const formatNumberInput = (val) => {
   if (!digits) return isNegative ? '-' : '';
   const formatted = new Intl.NumberFormat('en-US').format(digits);
   return isNegative ? `-${formatted}` : formatted;
+};
+
+// --- Gemini API Key Helpers ---
+export const getGeminiApiKey = () => {
+  const username = getActiveUser();
+  if (!username) return '';
+  return localStorage.getItem(`${KEYS.GEMINI_API_KEY}_${username}`) || '';
+};
+
+export const saveGeminiApiKey = (key) => {
+  const username = getActiveUser();
+  if (!username) return false;
+  if (key) {
+    localStorage.setItem(`${KEYS.GEMINI_API_KEY}_${username}`, key.trim());
+  } else {
+    localStorage.removeItem(`${KEYS.GEMINI_API_KEY}_${username}`);
+  }
+  return true;
 };

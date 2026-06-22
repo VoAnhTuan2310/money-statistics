@@ -12,7 +12,8 @@ import {
   X,
   Wallet,
   User,
-  LogOut
+  LogOut,
+  Sparkles
 } from 'lucide-react';
 import { 
   getTransactions, 
@@ -36,7 +37,9 @@ import {
   addRecurringTransaction,
   deleteRecurringTransaction,
   processRecurringTransactions,
-  clearUserData
+  clearUserData,
+  getGeminiApiKey,
+  saveGeminiApiKey
 } from './utils/storage';
 
 import Dashboard from './components/Dashboard';
@@ -44,6 +47,7 @@ import Transactions from './components/Transactions';
 import Savings from './components/Savings';
 import BudgetSettings from './components/BudgetSettings';
 import FinancialTips from './components/FinancialTips';
+import AiAssistant from './components/AiAssistant';
 import Login from './components/Login';
 
 export default function App() {
@@ -55,6 +59,7 @@ export default function App() {
   const [savingsPots, setSavingsPots] = useState([]);
   const [categories, setCategories] = useState({ income: [], expense: [] });
   const [recurringList, setRecurringList] = useState([]);
+  const [geminiKey, setGeminiKey] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeUser, setActiveUser] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -73,12 +78,13 @@ export default function App() {
       setSavingsPots(getSavingsPots());
       setCategories(getUserCategories());
       setRecurringList(getRecurringTransactions());
+      setGeminiKey(getGeminiApiKey());
 
       // Auto-process recurring transactions on load
       setTimeout(() => {
         const result = processRecurringTransactions(username);
         if (result.success && result.addedCount > 0) {
-          alert(`Hệ thống FinTrack: Đã tự động ghi nhận ${result.addedCount} giao dịch định kỳ đến hạn của bạn!`);
+          alert(`Hệ thống AnhTuan: Đã tự động ghi nhận ${result.addedCount} giao dịch định kỳ đến hạn của bạn!`);
           setTransactions(getTransactions());
           setRecurringList(getRecurringTransactions());
         }
@@ -109,12 +115,13 @@ export default function App() {
     setSavingsPots(getSavingsPots());
     setCategories(getUserCategories());
     setRecurringList(getRecurringTransactions());
+    setGeminiKey(getGeminiApiKey());
 
     // Auto-process recurring transactions immediately after login
     setTimeout(() => {
       const result = processRecurringTransactions(username);
       if (result.success && result.addedCount > 0) {
-        alert(`Hệ thống FinTrack: Đã tự động ghi nhận ${result.addedCount} giao dịch định kỳ đến hạn của bạn!`);
+        alert(`Hệ thống AnhTuan: Đã tự động ghi nhận ${result.addedCount} giao dịch định kỳ đến hạn của bạn!`);
         setTransactions(getTransactions());
         setRecurringList(getRecurringTransactions());
       }
@@ -182,8 +189,15 @@ export default function App() {
     setRecurringList(getRecurringTransactions());
   };
 
+  const handleSaveApiKey = (key) => {
+    saveGeminiApiKey(key);
+    setGeminiKey(getGeminiApiKey());
+  };
+
   const handleClearUserData = () => {
     clearUserData(activeUser);
+    saveGeminiApiKey('');
+    setGeminiKey('');
     logoutUser();
     setIsAuthenticated(false);
     setActiveUser('');
@@ -230,6 +244,7 @@ export default function App() {
     { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard },
     { id: 'transactions', label: 'Giao dịch', icon: FileText },
     { id: 'savings', label: 'Tiết kiệm', icon: PiggyBank },
+    { id: 'ai-assistant', label: 'Trợ lý AnhTuanAI', icon: Sparkles },
     { id: 'budget', label: 'Cấu hình & Bảo mật', icon: Settings },
     { id: 'tips', label: 'Trợ lý tài chính', icon: Lightbulb },
   ];
@@ -267,6 +282,17 @@ export default function App() {
             onAddTransaction={handleAddTransaction} 
           />
         );
+      case 'ai-assistant':
+        return (
+          <AiAssistant 
+            transactions={transactions}
+            budget={budget}
+            savingsPots={savingsPots}
+            activeUser={activeUser}
+            geminiKey={geminiKey}
+            onNavigate={(tab) => setActiveTab(tab)}
+          />
+        );
       case 'budget':
         return (
           <BudgetSettings 
@@ -274,11 +300,13 @@ export default function App() {
             categories={categories}
             recurringList={recurringList}
             activeUser={activeUser}
+            geminiKey={geminiKey}
             onSave={handleSaveBudget} 
             onAddCategory={handleAddCategory}
             onDeleteCategory={handleDeleteCategory}
             onAddRecurring={handleAddRecurring}
             onDeleteRecurring={handleDeleteRecurring}
+            onSaveApiKey={handleSaveApiKey}
             onClearUserData={handleClearUserData}
           />
         );
@@ -329,7 +357,7 @@ export default function App() {
             <Wallet className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-xl font-black bg-gradient-to-r from-white to-purple-400 bg-clip-text text-transparent">FinTrack</h1>
+            <h1 className="text-xl font-black bg-gradient-to-r from-white to-purple-400 bg-clip-text text-transparent">AnhTuan</h1>
             <span className="text-[10px] text-slate-500 font-semibold tracking-wider uppercase">Tài chính cá nhân</span>
           </div>
         </div>
@@ -356,7 +384,7 @@ export default function App() {
                 onClick={() => setActiveTab(item.id)}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer btn-click-effect ${
                   isActive 
-                    ? 'bg-purple-600/15 text-purple-450 border border-purple-500/20 shadow-[0_0_15px_-3px_rgba(168,85,247,0.2)] font-bold text-glow-purple' 
+                    ? 'bg-purple-600/15 text-purple-455 border border-purple-500/20 shadow-[0_0_15px_-3px_rgba(168,85,247,0.2)] font-bold text-glow-purple' 
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/40 border border-transparent'
                 }`}
               >
@@ -398,14 +426,14 @@ export default function App() {
         {/* Mobile Header */}
         <header className="md:hidden flex items-center justify-between p-4 glass-panel border-b border-slate-900/60 sticky top-0 z-30 bg-slate-950/60">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-tr from-purple-600 to-indigo-650 rounded-lg flex items-center justify-center text-white shadow-md">
+            <div className="w-8 h-8 bg-gradient-to-tr from-purple-600 to-indigo-655 rounded-lg flex items-center justify-center text-white shadow-md">
               <Wallet className="w-4 h-4" />
             </div>
-            <h1 className="text-lg font-black bg-gradient-to-r from-white to-purple-400 bg-clip-text text-transparent">FinTrack</h1>
+            <h1 className="text-lg font-black bg-gradient-to-r from-white to-purple-400 bg-clip-text text-transparent">AnhTuan</h1>
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-800 text-xs font-bold text-purple-400">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-800 text-xs font-bold text-purple-450">
               <User className="w-3.5 h-3.5" />
               <span className="max-w-[70px] truncate">{activeUser}</span>
             </div>
@@ -453,7 +481,7 @@ export default function App() {
                       }}
                       className={`w-full flex items-center gap-4 px-5 py-3.5 rounded-xl text-base font-semibold transition cursor-pointer btn-click-effect ${
                         isActive 
-                          ? 'bg-purple-600/15 text-purple-450 border border-purple-500/20 shadow-[0_0_15px_-3px_rgba(168,85,247,0.2)] font-bold text-glow-purple' 
+                          ? 'bg-purple-600/15 text-purple-455 border border-purple-500/20 shadow-[0_0_15px_-3px_rgba(168,85,247,0.2)] font-bold text-glow-purple' 
                           : 'text-slate-400 border border-transparent'
                       }`}
                     >
@@ -484,7 +512,7 @@ export default function App() {
 
               <button
                 onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold text-rose-400 bg-rose-500/5 border border-rose-500/10 cursor-pointer btn-click-effect"
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold text-rose-450 bg-rose-500/5 border border-rose-500/10 cursor-pointer btn-click-effect"
               >
                 <LogOut className="w-4 h-4" />
                 <span>Đăng xuất tài khoản</span>
