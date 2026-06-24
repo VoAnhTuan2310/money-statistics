@@ -27,9 +27,7 @@ import {
   getSavingsPots, 
   addSavingsPot, 
   deleteSavingsPot, 
-  updateSavingsPot, 
-  exportData, 
-  importData, 
+  updateSavingsPot,
   getActiveUser,
   logoutUser,
   getUserRole,
@@ -298,8 +296,8 @@ export default function App() {
     setWallets(getWallets());
   };
 
-  const handleClearUserData = () => {
-    clearUserData(activeUser);
+  const handleClearUserData = async () => {
+    await clearUserData(activeUser);
     saveGeminiApiKey('');
     setGeminiKey('');
     setWallets([]);
@@ -311,27 +309,7 @@ export default function App() {
     alert('Đã xóa sạch toàn bộ dữ liệu tài khoản và đăng xuất!');
   };
 
-  const handleExport = () => {
-    exportData();
-  };
 
-  const handleImport = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = importData(event.target.result);
-      if (result.success) {
-        alert('Nhập dữ liệu thành công!');
-        setTransactions(getTransactions());
-        setBudget(getBudget());
-        setSavingsPots(getSavingsPots());
-      } else {
-        alert('Nhập dữ liệu thất bại: ' + result.error);
-      }
-    };
-    reader.readAsText(file);
-  };
 
   const handleLogout = () => {
     if (confirm('Bạn có chắc chắn muốn đăng xuất khỏi tài khoản?')) {
@@ -540,21 +518,7 @@ export default function App() {
         </nav>
 
         {/* Quick Actions at Bottom of Sidebar */}
-        <div className="border-t border-slate-900/80 pt-4 space-y-2 mt-4">
-          <label className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-250 hover:bg-slate-900/35 transition cursor-pointer border border-transparent btn-click-effect">
-            <Upload className="w-4 h-4" />
-            <span>Nhập dữ liệu</span>
-            <input type="file" accept=".json" onChange={handleImport} className="hidden" />
-          </label>
-
-          <button
-            onClick={handleExport}
-            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-250 hover:bg-slate-900/35 transition cursor-pointer border border-transparent btn-click-effect"
-          >
-            <Download className="w-4 h-4" />
-            <span>Xuất dữ liệu</span>
-          </button>
-
+        <div className="border-t border-slate-900/80 pt-4 mt-4">
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold text-rose-400 hover:bg-rose-500/10 hover:text-rose-350 transition cursor-pointer border border-transparent btn-click-effect"
@@ -639,23 +603,7 @@ export default function App() {
             </div>
 
             {/* Sticky/Fixed bottom action buttons */}
-            <div className="border-t border-slate-900 pt-4 space-y-3 flex-shrink-0 mt-auto">
-              <div className="grid grid-cols-2 gap-3">
-                <label className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold text-slate-350 bg-slate-900 border border-slate-800 cursor-pointer btn-click-effect">
-                  <Upload className="w-4 h-4" />
-                  <span>Nhập JSON</span>
-                  <input type="file" accept=".json" onChange={(e) => { handleImport(e); setMobileMenuOpen(false); }} className="hidden" />
-                </label>
-
-                <button
-                  onClick={() => { handleExport(); setMobileMenuOpen(false); }}
-                  className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold text-slate-350 bg-slate-900 border border-slate-800 cursor-pointer btn-click-effect"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Xuất JSON</span>
-                </button>
-              </div>
-
+            <div className="border-t border-slate-900 pt-4 flex-shrink-0 mt-auto">
               <button
                 onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold text-rose-455 bg-rose-500/5 border border-rose-500/10 cursor-pointer btn-click-effect"

@@ -10,6 +10,7 @@ export default function Login({ onLoginSuccess }) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const [particles, setParticles] = useState([]);
 
   const cornerLines = [
@@ -42,7 +43,7 @@ export default function Login({ onLoginSuccess }) {
     setSuccessMsg('');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccessMsg('');
@@ -57,32 +58,42 @@ export default function Login({ onLoginSuccess }) {
       return;
     }
 
-    if (isRegistering) {
-      if (password.length < 6) {
-        setError('Mật khẩu phải chứa ít nhất 6 ký tự!');
-        return;
-      }
-      if (password !== confirmPassword) {
-        setError('Mật khẩu xác nhận không trùng khớp!');
-        return;
-      }
+    setIsLoading(true);
+    try {
+      if (isRegistering) {
+        if (password.length < 6) {
+          setError('Mật khẩu phải chứa ít nhất 6 ký tự!');
+          setIsLoading(false);
+          return;
+        }
+        if (password !== confirmPassword) {
+          setError('Mật khẩu xác nhận không trùng khớp!');
+          setIsLoading(false);
+          return;
+        }
 
-      const res = registerUser(trimmedUsername, password);
-      if (res.success) {
-        setSuccessMsg('Đăng ký tài khoản thành công! Hãy đăng nhập.');
-        setIsRegistering(false);
-        setPassword('');
-        setConfirmPassword('');
+        const res = await registerUser(trimmedUsername, password);
+        if (res.success) {
+          setSuccessMsg('Đăng ký tài khoản thành công! Hãy đăng nhập.');
+          setIsRegistering(false);
+          setPassword('');
+          setConfirmPassword('');
+        } else {
+          setError(res.error);
+        }
       } else {
-        setError(res.error);
+        const res = await loginUser(trimmedUsername, password);
+        if (res.success) {
+          onLoginSuccess();
+        } else {
+          setError(res.error);
+        }
       }
-    } else {
-      const res = loginUser(trimmedUsername, password);
-      if (res.success) {
-        onLoginSuccess();
-      } else {
-        setError(res.error);
-      }
+    } catch (err) {
+      console.error(err);
+      setError('Có lỗi kết nối cơ sở dữ liệu online!');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -224,9 +235,10 @@ export default function Login({ onLoginSuccess }) {
               <input
                 type="text"
                 required
+                disabled={isLoading}
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 rounded-xl glass-input text-sm font-medium"
+                className="w-full pl-11 pr-4 py-3 rounded-xl glass-input text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 placeholder="Nhập tên đăng nhập..."
               />
             </div>
@@ -242,9 +254,10 @@ export default function Login({ onLoginSuccess }) {
               <input
                 type={showPassword ? "text" : "password"}
                 required
+                disabled={isLoading}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-11 pr-12 py-3 rounded-xl glass-input text-sm font-medium"
+                className="w-full pl-11 pr-12 py-3 rounded-xl glass-input text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 placeholder={isRegistering ? "Tối thiểu 6 ký tự..." : "Nhập mật khẩu..."}
               />
               <button
@@ -269,9 +282,10 @@ export default function Login({ onLoginSuccess }) {
                 <input
                   type={showPassword ? "text" : "password"}
                   required
+                  disabled={isLoading}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 rounded-xl glass-input text-sm font-medium"
+                  className="w-full pl-11 pr-4 py-3 rounded-xl glass-input text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   placeholder="Nhập lại mật khẩu..."
                 />
               </div>
@@ -297,10 +311,15 @@ export default function Login({ onLoginSuccess }) {
           {/* Submit button */}
           <button
             type="submit"
-            className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-650 hover:from-purple-550 hover:to-indigo-600 text-white font-bold shadow-lg shadow-purple-500/15 transition-all duration-200 cursor-pointer mt-4 flex items-center justify-center gap-2 border border-purple-500/20 shimmer-btn"
+            disabled={isLoading}
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-650 hover:from-purple-550 hover:to-indigo-600 text-white font-bold shadow-lg shadow-purple-500/15 transition-all duration-200 cursor-pointer mt-4 flex items-center justify-center gap-2 border border-purple-500/20 shimmer-btn disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isRegistering ? <UserPlus className="w-5 h-5" /> : <LogIn className="w-5 h-5" />}
-            {isRegistering ? 'Đăng Ký Tài Khoản' : 'Đăng Nhập'}
+            {isLoading ? (
+              <span className="w-5 h-5 border-2 border-slate-400 border-t-white rounded-full animate-spin" />
+            ) : (
+              isRegistering ? <UserPlus className="w-5 h-5" /> : <LogIn className="w-5 h-5" />
+            )}
+            {isLoading ? 'Đang tải & đồng bộ dữ liệu...' : (isRegistering ? 'Đăng Ký Tài Khoản' : 'Đăng Nhập')}
           </button>
         </form>
 

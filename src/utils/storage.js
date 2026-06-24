@@ -1,3 +1,6 @@
+import { db } from './firebase';
+import { doc, getDoc, setDoc, deleteDoc, getDocs, collection } from 'firebase/firestore';
+
 // LocalStorage Keys
 const KEYS = {
   TRANSACTIONS: 'fintrack_transactions',
@@ -122,134 +125,289 @@ export const setActiveUser = (username) => {
   }
 };
 
-export const getUsers = () => {
-  const users = getJSON(KEYS.USERS, []);
-  if (users.length === 0) {
-    const defaultAdmin = { username: 'admin', password: 'admin', role: 'admin' };
-    setJSON(KEYS.USERS, [defaultAdmin]);
-    return [defaultAdmin];
+// --- Firebase Online Sync ---
+export const syncPush = async (username, type, data) => {
+  if (!username) return;
+  try {
+    const docRef = doc(db, `userdata_${type}`, username.toLowerCase());
+    await setDoc(docRef, { data });
+  } catch (error) {
+    console.error(`Error syncing ${type} to Firestore for ${username}:`, error);
   }
-  const hasAdmin = users.some(u => u.role === 'admin');
-  if (!hasAdmin) {
-    const adminUser = users.find(u => u.username.toLowerCase() === 'admin');
-    if (adminUser) {
-      adminUser.role = 'admin';
-    } else {
-      users.push({ username: 'admin', password: 'admin', role: 'admin' });
+};
+
+export const syncPull = async (username, type, defaultValue) => {
+  if (!username) return defaultValue;
+  try {
+    const docRef = doc(db, `userdata_${type}`, username.toLowerCase());
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return docSnap.data().data;
     }
-    setJSON(KEYS.USERS, users);
+  } catch (error) {
+    console.error(`Error pulling ${type} from Firestore for ${username}:`, error);
   }
-  return users;
+  return defaultValue;
+};
+
+export const syncPullAll = async (username) => {
+  if (!username) return;
+  const normalized = username.trim().toLowerCase();
+  
+  const [
+    transactions,
+    budget,
+    savings,
+    categories,
+    recurring,
+    wallets,
+    geminiKey
+  ] = await Promise.all([
+    syncPull(normalized, 'transactions', null),
+    syncPull(normalized, 'budget', null),
+    syncPull(normalized, 'savings_pots', null),
+    syncPull(normalized, 'categories', null),
+    syncPull(normalized, 'recurring', null),
+    syncPull(normalized, 'wallets', null),
+    syncPull(normalized, 'gemini_api_key', null)
+  ]);
+
+  const storageUsername = username.trim();
+  
+  if (transactions !== null) setJSON(`${KEYS.TRANSACTIONS}_${storageUsername}`, transactions);
+  if (budget !== null) setJSON(`${KEYS.BUDGET}_${storageUsername}`, budget);
+  if (savings !== null) setJSON(`${KEYS.SAVINGS_POTS}_${storageUsername}`, savings);
+  if (categories !== null) setJSON(`fintrack_categories_${storageUsername}`, categories);
+  if (recurring !== null) setJSON(`fintrack_recurring_${storageUsername}`, recurring);
+  if (wallets !== null) setJSON(`${KEYS.WALLETS}_${storageUsername}`, wallets);
+  if (geminiKey !== null) localStorage.setItem(`${KEYS.GEMINI_API_KEY}_${storageUsername}`, geminiKey);
+};
+
+export const getUsers = async () => {
+  try {
+    const querySnapshot = await getDocs(collection(db, 'users'));
+    const users = [];
+    querySnapshot.forEach((doc) => {
+      users.push(doc.data());
+    });
+    
+    if (users.length === 0) {
+      const defaultAdmin = { username: 'admin', password: 'admin', role: 'admin' };
+      await setDoc(doc(db, 'users', 'admin'), defaultAdmin);
+      return [defaultAdmin];
+    }
+    
+    const hasAdmin = users.some(u => u.role === 'admin');
+    if (!hasAdmin) {
+      const adminUser = users.find(u => u.username.toLowerCase() === 'admin');
+      if (adminUser) {
+        adminUser.role = 'admin';
+        await setDoc(doc(db, 'users', adminUser.username.toLowerCase()), adminUser);
+      } else {
+        const adminData = { username: 'admin', password: 'admin', role: 'admin' };
+        await setDoc(doc(db, 'users', 'admin'), adminData);
+        users.push(adminData);
+      }
+    }
+    
+    setJSON(KEYS.USERS, users);
+    return users;
+  } catch (error) {
+    console.error('Error fetching users online:', error);
+    return getJSON(KEYS.USERS, [{ username: 'admin', password: 'admin', role: 'admin' }]);
+  }
 };
 
 export const getUserRole = (username) => {
-  const users = getUsers();
+  const users = getJSON(KEYS.USERS, []);
   const normalized = username.trim().toLowerCase();
   const user = users.find(u => u.username.toLowerCase() === normalized);
   return user ? (user.role || 'user') : 'user';
 };
 
-export const registerUser = (username, password) => {
-  const users = getUsers();
+export const registerUser = async (username, password) => {
   const normalized = username.trim();
-  const exists = users.some(u => u.username.toLowerCase() === normalized.toLowerCase());
-  if (exists) {
-    return { success: false, error: 'Tên tài khoản đã tồn tại!' };
+  const normalizedLower = normalized.toLowerCase();
+  try {
+    const userDocRef = doc(db, 'users', normalizedLower);
+    const userSnap = await getDoc(userDocRef);
+    if (userSnap.exists()) {
+      return { success: false, error: 'Tên tài khoản đã tồn tại!' };
+    }
+    
+    const newUser = { username: normalized, password, role: 'user' };
+    await setDoc(userDocRef, newUser);
+    
+    const localUsers = getJSON(KEYS.USERS, []);
+    localUsers.push(newUser);
+    setJSON(KEYS.USERS, localUsers);
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error registering user online:', error);
+    return { success: false, error: 'Lỗi kết nối cơ sở dữ liệu online!' };
   }
-  users.push({ username: normalized, password, role: 'user' });
-  setJSON(KEYS.USERS, users);
-  return { success: true };
 };
 
-export const loginUser = (username, password) => {
-  const users = getUsers();
-  const normalized = username.trim();
-  const user = users.find(u => u.username.toLowerCase() === normalized.toLowerCase() && u.password === password);
-  if (!user) {
-    return { success: false, error: 'Tài khoản hoặc mật khẩu không chính xác!' };
+export const loginUser = async (username, password) => {
+  const normalized = username.trim().toLowerCase();
+  try {
+    const userDocRef = doc(db, 'users', normalized);
+    const userSnap = await getDoc(userDocRef);
+    
+    if (!userSnap.exists()) {
+      if (normalized === 'admin' && password === 'admin') {
+        const defaultAdmin = { username: 'admin', password: 'admin', role: 'admin' };
+        await setDoc(userDocRef, defaultAdmin);
+        setActiveUser('admin');
+        await syncPullAll('admin');
+        return { success: true, username: 'admin', role: 'admin' };
+      }
+      return { success: false, error: 'Tài khoản hoặc mật khẩu không chính xác!' };
+    }
+    
+    const userData = userSnap.data();
+    if (userData.password !== password) {
+      return { success: false, error: 'Tài khoản hoặc mật khẩu không chính xác!' };
+    }
+    
+    setActiveUser(userData.username);
+    await syncPullAll(userData.username);
+    return { success: true, username: userData.username, role: userData.role || 'user' };
+  } catch (error) {
+    console.error('Error logging in online:', error);
+    const localUsers = getJSON(KEYS.USERS, []);
+    const localUser = localUsers.find(u => u.username.toLowerCase() === normalized && u.password === password);
+    if (localUser) {
+      setActiveUser(localUser.username);
+      return { success: true, username: localUser.username, role: localUser.role || 'user', offline: true };
+    }
+    return { success: false, error: 'Lỗi kết nối cơ sở dữ liệu online!' };
   }
-  setActiveUser(user.username);
-  return { success: true, username: user.username, role: user.role || 'user' };
 };
 
 export const logoutUser = () => {
   setActiveUser('');
 };
 
-export const changeUserPassword = (username, newPassword) => {
-  const users = getUsers();
-  const normalized = username.trim();
-  const index = users.findIndex(u => u.username.toLowerCase() === normalized.toLowerCase());
-  if (index === -1) {
-    return { success: false, error: 'Tài khoản không tồn tại!' };
+export const changeUserPassword = async (username, newPassword) => {
+  const normalized = username.trim().toLowerCase();
+  try {
+    const userDocRef = doc(db, 'users', normalized);
+    await setDoc(userDocRef, { password: newPassword }, { merge: true });
+    
+    const users = getJSON(KEYS.USERS, []);
+    const index = users.findIndex(u => u.username.toLowerCase() === normalized);
+    if (index !== -1) {
+      users[index].password = newPassword;
+      setJSON(KEYS.USERS, users);
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('Error changing user password online:', error);
+    return { success: false, error: 'Lỗi kết nối cơ sở dữ liệu online!' };
   }
-  users[index].password = newPassword;
-  setJSON(KEYS.USERS, users);
-  return { success: true };
 };
 
-export const adminCreateUser = (username, password, role) => {
-  const users = getUsers();
+export const adminCreateUser = async (username, password, role) => {
   const normalized = username.trim();
   if (!normalized) return { success: false, error: 'Tên tài khoản không được để trống!' };
-  const exists = users.some(u => u.username.toLowerCase() === normalized.toLowerCase());
-  if (exists) {
-    return { success: false, error: 'Tên tài khoản đã tồn tại!' };
-  }
-  users.push({ username: normalized, password, role: role || 'user' });
-  setJSON(KEYS.USERS, users);
-  return { success: true };
-};
-
-export const adminUpdateUserRole = (username, role) => {
-  const users = getUsers();
-  const normalized = username.trim().toLowerCase();
-  const index = users.findIndex(u => u.username.toLowerCase() === normalized);
-  if (index === -1) return { success: false, error: 'Tài khoản không tồn tại!' };
-  
-  if (users[index].role === 'admin' && role !== 'admin') {
-    const adminCount = users.filter(u => u.role === 'admin').length;
-    if (adminCount <= 1) {
-      return { success: false, error: 'Không thể hạ quyền của tài khoản Admin duy nhất!' };
+  try {
+    const userDocRef = doc(db, 'users', normalized.toLowerCase());
+    const userSnap = await getDoc(userDocRef);
+    if (userSnap.exists()) {
+      return { success: false, error: 'Tên tài khoản đã tồn tại!' };
     }
+    
+    const newUser = { username: normalized, password, role: role || 'user' };
+    await setDoc(userDocRef, newUser);
+    
+    const localUsers = getJSON(KEYS.USERS, []);
+    localUsers.push(newUser);
+    setJSON(KEYS.USERS, localUsers);
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error creating user online:', error);
+    return { success: false, error: 'Lỗi kết nối cơ sở dữ liệu online!' };
   }
-  
-  users[index].role = role;
-  setJSON(KEYS.USERS, users);
-  return { success: true };
 };
 
-export const adminDeleteUser = (username) => {
-  const users = getUsers();
+export const adminUpdateUserRole = async (username, role) => {
   const normalized = username.trim().toLowerCase();
-  const index = users.findIndex(u => u.username.toLowerCase() === normalized);
-  if (index === -1) return { success: false, error: 'Tài khoản không tồn tại!' };
-  
-  if (users[index].role === 'admin') {
-    const adminCount = users.filter(u => u.role === 'admin').length;
-    if (adminCount <= 1) {
-      return { success: false, error: 'Không thể xóa tài khoản Admin duy nhất!' };
+  try {
+    const users = await getUsers();
+    const index = users.findIndex(u => u.username.toLowerCase() === normalized);
+    if (index === -1) return { success: false, error: 'Tài khoản không tồn tại!' };
+    
+    if (users[index].role === 'admin' && role !== 'admin') {
+      const adminCount = users.filter(u => u.role === 'admin').length;
+      if (adminCount <= 1) {
+        return { success: false, error: 'Không thể hạ quyền của tài khoản Admin duy nhất!' };
+      }
     }
+    
+    const userDocRef = doc(db, 'users', normalized);
+    await setDoc(userDocRef, { role }, { merge: true });
+    
+    users[index].role = role;
+    setJSON(KEYS.USERS, users);
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating user role online:', error);
+    return { success: false, error: 'Lỗi kết nối cơ sở dữ liệu online!' };
   }
-  
-  const targetUsername = users[index].username;
-  const filteredUsers = users.filter(u => u.username.toLowerCase() !== normalized);
-  setJSON(KEYS.USERS, filteredUsers);
-  
-  clearUserData(targetUsername);
-  
-  return { success: true };
 };
 
-export const adminResetPassword = (username, password) => {
-  const users = getUsers();
+export const adminDeleteUser = async (username) => {
   const normalized = username.trim().toLowerCase();
-  const index = users.findIndex(u => u.username.toLowerCase() === normalized);
-  if (index === -1) return { success: false, error: 'Tài khoản không tồn tại!' };
-  
-  users[index].password = password;
-  setJSON(KEYS.USERS, users);
-  return { success: true };
+  try {
+    const users = await getUsers();
+    const index = users.findIndex(u => u.username.toLowerCase() === normalized);
+    if (index === -1) return { success: false, error: 'Tài khoản không tồn tại!' };
+    
+    if (users[index].role === 'admin') {
+      const adminCount = users.filter(u => u.role === 'admin').length;
+      if (adminCount <= 1) {
+        return { success: false, error: 'Không thể xóa tài khoản Admin duy nhất!' };
+      }
+    }
+    
+    await deleteDoc(doc(db, 'users', normalized));
+    
+    const collectionsToDelete = ['transactions', 'budget', 'savings_pots', 'categories', 'recurring', 'wallets', 'gemini_api_key'];
+    await Promise.all(collectionsToDelete.map(type => 
+      deleteDoc(doc(db, `userdata_${type}`, normalized))
+    ));
+    
+    const filteredUsers = users.filter(u => u.username.toLowerCase() !== normalized);
+    setJSON(KEYS.USERS, filteredUsers);
+    
+    await clearUserData(users[index].username);
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting user online:', error);
+    return { success: false, error: 'Lỗi kết nối cơ sở dữ liệu online!' };
+  }
+};
+
+export const adminResetPassword = async (username, password) => {
+  const normalized = username.trim().toLowerCase();
+  try {
+    const users = await getUsers();
+    const index = users.findIndex(u => u.username.toLowerCase() === normalized);
+    if (index === -1) return { success: false, error: 'Tài khoản không tồn tại!' };
+    
+    const userDocRef = doc(db, 'users', normalized);
+    await setDoc(userDocRef, { password }, { merge: true });
+    
+    users[index].password = password;
+    setJSON(KEYS.USERS, users);
+    return { success: true };
+  } catch (error) {
+    console.error('Error resetting password online:', error);
+    return { success: false, error: 'Lỗi kết nối cơ sở dữ liệu online!' };
+  }
 };
 
 export const exportSystemDatabase = () => {
@@ -274,7 +432,7 @@ export const exportSystemDatabase = () => {
   downloadAnchor.remove();
 };
 
-export const importSystemDatabase = (jsonData) => {
+export const importSystemDatabase = async (jsonData) => {
   try {
     const data = JSON.parse(jsonData);
     const keys = Object.keys(data);
@@ -292,15 +450,50 @@ export const importSystemDatabase = (jsonData) => {
     }
     keysToRemove.forEach(k => localStorage.removeItem(k));
     
-    Object.entries(data).forEach(([key, val]) => {
-      if (key !== 'fintrack_active_user') {
+    for (const [key, val] of Object.entries(data)) {
+      if (key === KEYS.USERS) {
+        setJSON(key, val);
+        for (const user of val) {
+          await setDoc(doc(db, 'users', user.username.toLowerCase()), user);
+        }
+      } else if (key.startsWith('fintrack_') && key !== 'fintrack_active_user') {
         if (typeof val === 'object') {
-          localStorage.setItem(key, JSON.stringify(val));
+          setJSON(key, val);
         } else {
           localStorage.setItem(key, val);
         }
+        
+        let type = '';
+        let username = '';
+        
+        if (key.startsWith(`${KEYS.TRANSACTIONS}_`)) {
+          type = 'transactions';
+          username = key.substring(`${KEYS.TRANSACTIONS}_`.length);
+        } else if (key.startsWith(`${KEYS.BUDGET}_`)) {
+          type = 'budget';
+          username = key.substring(`${KEYS.BUDGET}_`.length);
+        } else if (key.startsWith(`${KEYS.SAVINGS_POTS}_`)) {
+          type = 'savings_pots';
+          username = key.substring(`${KEYS.SAVINGS_POTS}_`.length);
+        } else if (key.startsWith('fintrack_categories_')) {
+          type = 'categories';
+          username = key.substring('fintrack_categories_'.length);
+        } else if (key.startsWith('fintrack_recurring_')) {
+          type = 'recurring';
+          username = key.substring('fintrack_recurring_'.length);
+        } else if (key.startsWith(`${KEYS.WALLETS}_`)) {
+          type = 'wallets';
+          username = key.substring(`${KEYS.WALLETS}_`.length);
+        } else if (key.startsWith(`${KEYS.GEMINI_API_KEY}_`)) {
+          type = 'gemini_api_key';
+          username = key.substring(`${KEYS.GEMINI_API_KEY}_`.length);
+        }
+        
+        if (type && username) {
+          await syncPush(username, type, val);
+        }
       }
-    });
+    }
     
     return { success: true };
   } catch (error) {
@@ -309,8 +502,7 @@ export const importSystemDatabase = (jsonData) => {
   }
 };
 
-
-export const clearUserData = (username) => {
+export const clearUserData = async (username) => {
   const normalized = username.trim();
   localStorage.removeItem(`${KEYS.TRANSACTIONS}_${normalized}`);
   localStorage.removeItem(`${KEYS.BUDGET}_${normalized}`);
@@ -318,6 +510,17 @@ export const clearUserData = (username) => {
   localStorage.removeItem(`fintrack_categories_${normalized}`);
   localStorage.removeItem(`fintrack_recurring_${normalized}`);
   localStorage.removeItem(`${KEYS.WALLETS}_${normalized}`);
+  
+  try {
+    const normalizedLower = normalized.toLowerCase();
+    const collectionsToDelete = ['transactions', 'budget', 'savings_pots', 'categories', 'recurring', 'wallets'];
+    await Promise.all(collectionsToDelete.map(type => 
+      deleteDoc(doc(db, `userdata_${type}`, normalizedLower))
+    ));
+  } catch (error) {
+    console.error('Error clearing user data online:', error);
+  }
+  
   return { success: true };
 };
 
@@ -342,7 +545,9 @@ export const getUserCategories = () => {
 export const saveUserCategories = (categories) => {
   const username = getActiveUser();
   if (!username) return false;
-  return setJSON(`fintrack_categories_${username}`, categories);
+  const res = setJSON(`fintrack_categories_${username}`, categories);
+  if (res) syncPush(username, 'categories', categories);
+  return res;
 };
 
 export const addUserCategory = (type, category) => {
@@ -381,7 +586,9 @@ export const saveRecurringTransactions = (list) => {
   const username = getActiveUser();
   if (!username) return false;
   const key = `fintrack_recurring_${username}`;
-  return setJSON(key, list);
+  const res = setJSON(key, list);
+  if (res) syncPush(username, 'recurring', list);
+  return res;
 };
 
 export const addRecurringTransaction = (item) => {
@@ -493,8 +700,10 @@ export const processRecurringTransactions = (username) => {
 
   if (changed) {
     setJSON(transactionsKey, txs);
+    syncPush(username, 'transactions', txs);
     const recurringKey = `fintrack_recurring_${username}`;
     setJSON(recurringKey, updatedRecurring);
+    syncPush(username, 'recurring', updatedRecurring);
   }
 
   return {
@@ -516,7 +725,10 @@ export const getTransactions = () => {
 };
 
 export const saveTransactions = (transactions) => {
-  return setJSON(getDynamicKey(KEYS.TRANSACTIONS), transactions);
+  const res = setJSON(getDynamicKey(KEYS.TRANSACTIONS), transactions);
+  const username = getActiveUser();
+  if (res && username) syncPush(username, 'transactions', transactions);
+  return res;
 };
 
 export const addTransaction = (tx) => {
@@ -560,7 +772,10 @@ export const getBudget = () => {
 };
 
 export const saveBudget = (budget) => {
-  return setJSON(getDynamicKey(KEYS.BUDGET), budget);
+  const res = setJSON(getDynamicKey(KEYS.BUDGET), budget);
+  const username = getActiveUser();
+  if (res && username) syncPush(username, 'budget', budget);
+  return res;
 };
 
 // --- Savings Pots API ---
@@ -575,7 +790,10 @@ export const getSavingsPots = () => {
 };
 
 export const saveSavingsPots = (pots) => {
-  return setJSON(getDynamicKey(KEYS.SAVINGS_POTS), pots);
+  const res = setJSON(getDynamicKey(KEYS.SAVINGS_POTS), pots);
+  const username = getActiveUser();
+  if (res && username) syncPush(username, 'savings_pots', pots);
+  return res;
 };
 
 export const addSavingsPot = (pot) => {
@@ -682,8 +900,10 @@ export const saveGeminiApiKey = (key) => {
   if (!username) return false;
   if (key) {
     localStorage.setItem(`${KEYS.GEMINI_API_KEY}_${username}`, key.trim());
+    syncPush(username, 'gemini_api_key', key.trim());
   } else {
     localStorage.removeItem(`${KEYS.GEMINI_API_KEY}_${username}`);
+    syncPush(username, 'gemini_api_key', '');
   }
   return true;
 };
@@ -705,7 +925,9 @@ export const saveWallets = (wallets) => {
   const username = getActiveUser();
   if (!username) return false;
   const key = `${KEYS.WALLETS}_${username}`;
-  return setJSON(key, wallets);
+  const res = setJSON(key, wallets);
+  if (res) syncPush(username, 'wallets', wallets);
+  return res;
 };
 
 export const addWallet = (wallet) => {

@@ -171,7 +171,7 @@ export default function BudgetSettings({
   };
 
   // Handle Password Change
-  const handlePasswordSubmit = (e) => {
+  const handlePasswordSubmit = async (e) => {
     e.preventDefault();
     setSecMessage(null);
     if (newPassword.length < 6) {
@@ -183,7 +183,7 @@ export default function BudgetSettings({
       return;
     }
 
-    const res = changeUserPassword(activeUser, newPassword);
+    const res = await changeUserPassword(activeUser, newPassword);
     if (res.success) {
       setSecMessage({ type: 'success', text: 'Đổi mật khẩu thành công!' });
       setNewPassword('');
