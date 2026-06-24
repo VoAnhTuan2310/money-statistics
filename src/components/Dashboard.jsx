@@ -9,44 +9,22 @@ import {
 } from 'recharts';
 import { formatVND, formatNumberInput } from '../utils/storage';
 
-export default function Dashboard({ transactions, budget, savingsPots, onNavigate, onAddTransaction }) {
+export default function Dashboard({ transactions, budget, savingsPots, wallets = [], onNavigate, onAddTransaction, userRole = 'user' }) {
   const currentMonth = new Date().toISOString().substring(0, 7); // YYYY-MM
-  const [showBalanceModal, setShowBalanceModal] = useState(false);
-  const [newBalanceValue, setNewBalanceValue] = useState('');
-
-  const handleBalanceSubmit = (e) => {
-    e.preventDefault();
-    const targetVal = Number(newBalanceValue);
-    if (isNaN(targetVal)) return;
-
-    const diff = targetVal - stats.activeBalance;
-    if (diff !== 0) {
-      onAddTransaction({
-        type: diff > 0 ? 'income' : 'expense',
-        amount: Math.abs(diff),
-        category: 'Điều chỉnh số dư',
-        date: new Date().toISOString().split('T')[0],
-        note: 'Điều chỉnh số dư tài khoản thực tế'
-      });
-    }
-    setShowBalanceModal(false);
-  };
 
   // Memoized Calculations
   const stats = useMemo(() => {
     // Current month transactions
     const monthTxs = transactions.filter(t => t.date.startsWith(currentMonth));
     
-    const income = monthTxs.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-    const expense = monthTxs.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+    const income = monthTxs.filter(t => t.type === 'income' && !t.excludeFromStats).reduce((sum, t) => sum + t.amount, 0);
+    const expense = monthTxs.filter(t => t.type === 'expense' && !t.excludeFromStats).reduce((sum, t) => sum + t.amount, 0);
     
     // Total savings across all pots
     const totalSavings = savingsPots.reduce((sum, p) => sum + p.currentAmount, 0);
     
-    // Active balance = Total Income - Total Expense (all time or just current month? Let's do all time active balance)
-    const allIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-    const allExpense = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-    const activeBalance = allIncome - allExpense;
+    // Active balance = Sum of all wallet balances
+    const activeBalance = wallets.reduce((sum, w) => sum + (Number(w.balance) || 0), 0);
 
     return {
       monthlyIncome: income,
@@ -55,7 +33,7 @@ export default function Dashboard({ transactions, budget, savingsPots, onNavigat
       totalSavings,
       monthTxs
     };
-  }, [transactions, savingsPots, currentMonth]);
+  }, [transactions, savingsPots, wallets, currentMonth]);
 
   // Process data for Line Chart (Cashflow trend this month)
   const lineChartData = useMemo(() => {
@@ -70,6 +48,7 @@ export default function Dashboard({ transactions, budget, savingsPots, onNavigat
 
     // Populate data
     stats.monthTxs.forEach(tx => {
+      if (tx.excludeFromStats) return; // Skip excluded transactions in trend chart
       if (dataMap[tx.date]) {
         if (tx.type === 'income') {
           dataMap[tx.date]['Tiền vào'] += tx.amount;
@@ -87,7 +66,7 @@ export default function Dashboard({ transactions, budget, savingsPots, onNavigat
     const categoryTotals = {};
     
     stats.monthTxs
-      .filter(t => t.type === 'expense')
+      .filter(t => t.type === 'expense' && !t.excludeFromStats)
       .forEach(tx => {
         categoryTotals[tx.category] = (categoryTotals[tx.category] || 0) + tx.amount;
       });
@@ -118,6 +97,7 @@ export default function Dashboard({ transactions, budget, savingsPots, onNavigat
 
     // Populate data
     transactions.forEach(tx => {
+      if (tx.excludeFromStats) return; // Skip excluded transactions in monthly comparison chart
       const txMonth = tx.date.substring(0, 7);
       if (dataMap[txMonth]) {
         if (tx.type === 'income') {
@@ -166,16 +146,15 @@ export default function Dashboard({ transactions, budget, savingsPots, onNavigat
           <div className="flex-1 min-w-0">
             <span className="text-xs text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
               Số dư hiện tại
-              <button 
-                onClick={() => {
-                  setNewBalanceValue(stats.activeBalance.toString());
-                  setShowBalanceModal(true);
-                }}
-                className="text-slate-400 hover:text-indigo-400 p-0.5 rounded hover:bg-slate-900 transition cursor-pointer"
-                title="Sửa số dư nhanh"
-              >
-                <Edit className="w-3.5 h-3.5" />
-              </button>
+              {userRole !== 'user' && (
+                <button 
+                  onClick={() => onNavigate('wallets')}
+                  className="text-slate-400 hover:text-indigo-400 p-0.5 rounded hover:bg-slate-900 transition cursor-pointer"
+                  title="Quản lý Ví & Tài khoản"
+                >
+                  <Edit className="w-3.5 h-3.5" />
+                </button>
+              )}
             </span>
             <span className="text-2xl font-black text-white font-heading block truncate text-glow-purple">{formatVND(stats.activeBalance)}</span>
           </div>
@@ -434,20 +413,21 @@ export default function Dashboard({ transactions, budget, savingsPots, onNavigat
 
           <div className="divide-y divide-slate-900/50">
             {transactions.filter(t => t.type === 'expense').slice(0, 5).map(tx => (
-              <div key={tx.id} className="py-3 flex justify-between items-center hover:bg-slate-900/10 px-2 rounded-xl transition duration-150">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-rose-500/10 text-rose-450">
+              <div key={tx.id} className="py-3 flex justify-between items-center hover:bg-slate-900/10 px-2 rounded-xl transition duration-150 gap-3">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="p-2 rounded-lg bg-rose-500/10 text-rose-455 flex-shrink-0">
                     <ArrowDownLeft className="w-4 h-4" />
                   </div>
-                  <div>
-                    <span className="text-sm font-semibold text-slate-200 block">{tx.category}</span>
-                    <span className="text-xs text-slate-500 flex items-center gap-1.5">
-                      <Calendar className="w-3 h-3" /> {new Date(tx.date).toLocaleDateString('vi-VN')}
-                      {tx.note && <span className="text-slate-650 truncate max-w-[120px]">| {tx.note}</span>}
+                  <div className="min-w-0 flex-1">
+                    <span className="text-sm font-semibold text-slate-200 block truncate" title={tx.category}>{tx.category}</span>
+                    <span className="text-xs text-slate-500 flex items-center gap-1.5 min-w-0">
+                      <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span className="flex-shrink-0">{new Date(tx.date).toLocaleDateString('vi-VN')}</span>
+                      {tx.note && <span className="text-slate-650 truncate max-w-[80px] sm:max-w-[150px]" title={tx.note}>| {tx.note}</span>}
                     </span>
                   </div>
                 </div>
-                <span className="font-bold font-heading text-sm text-rose-450">
+                <span className="font-bold font-heading text-sm text-rose-455 flex-shrink-0">
                   -{formatVND(tx.amount)}
                 </span>
               </div>
@@ -475,20 +455,21 @@ export default function Dashboard({ transactions, budget, savingsPots, onNavigat
 
           <div className="divide-y divide-slate-900/50">
             {transactions.filter(t => t.type === 'income').slice(0, 5).map(tx => (
-              <div key={tx.id} className="py-3 flex justify-between items-center hover:bg-slate-900/10 px-2 rounded-xl transition duration-150">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-405">
+              <div key={tx.id} className="py-3 flex justify-between items-center hover:bg-slate-900/10 px-2 rounded-xl transition duration-150 gap-3">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-405 flex-shrink-0">
                     <ArrowUpRight className="w-4 h-4" />
                   </div>
-                  <div>
-                    <span className="text-sm font-semibold text-slate-200 block">{tx.category}</span>
-                    <span className="text-xs text-slate-500 flex items-center gap-1.5">
-                      <Calendar className="w-3 h-3" /> {new Date(tx.date).toLocaleDateString('vi-VN')}
-                      {tx.note && <span className="text-slate-650 truncate max-w-[120px]">| {tx.note}</span>}
+                  <div className="min-w-0 flex-1">
+                    <span className="text-sm font-semibold text-slate-200 block truncate" title={tx.category}>{tx.category}</span>
+                    <span className="text-xs text-slate-500 flex items-center gap-1.5 min-w-0">
+                      <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span className="flex-shrink-0">{new Date(tx.date).toLocaleDateString('vi-VN')}</span>
+                      {tx.note && <span className="text-slate-650 truncate max-w-[80px] sm:max-w-[150px]" title={tx.note}>| {tx.note}</span>}
                     </span>
                   </div>
                 </div>
-                <span className="font-bold font-heading text-sm text-emerald-450">
+                <span className="font-bold font-heading text-sm text-emerald-450 flex-shrink-0">
                   +{formatVND(tx.amount)}
                 </span>
               </div>
@@ -501,41 +482,7 @@ export default function Dashboard({ transactions, budget, savingsPots, onNavigat
         </div>
       </div>
 
-      {/* Balance Edit Modal */}
-      {showBalanceModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="glass-panel w-full max-w-sm p-6 rounded-2xl shadow-2xl relative animate-in fade-in zoom-in duration-200">
-            <button
-              onClick={() => setShowBalanceModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <h3 className="text-xl font-bold text-slate-100 mb-2 font-heading">Sửa Số Dư Nhanh</h3>
-            <p className="text-xs text-slate-400 mb-4">Nhập số dư tài khoản thực tế của bạn. Hệ thống sẽ tự động tạo một giao dịch điều chỉnh số dư chênh lệch.</p>
-            <form onSubmit={handleBalanceSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Số tiền số dư mới (VND)</label>
-                <input
-                  type="text"
-                  required
-                  autoFocus
-                  value={formatNumberInput(newBalanceValue)}
-                  onChange={(e) => setNewBalanceValue(e.target.value.replace(/[^\d-]/g, ''))}
-                  className="w-full px-4 py-2.5 rounded-xl glass-input text-lg font-bold"
-                  placeholder="Ví dụ: 10,000,000"
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold transition cursor-pointer text-sm shadow-md"
-              >
-                Cập Nhật Số Dư
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Balance Edit Modal removed - balance managed in Wallets page */}
     </div>
   );
 }

@@ -17,7 +17,8 @@ export default function BudgetSettings({
   activeUser,
   onClearUserData,
   geminiKey,
-  onSaveApiKey
+  onSaveApiKey,
+  userRole = 'user'
 }) {
   const [activeSubTab, setActiveSubTab] = useState('budget'); // 'budget', 'categories', 'recurring', 'security'
   
@@ -264,9 +265,10 @@ export default function BudgetSettings({
                   <div className="relative rounded-lg shadow-sm">
                     <input
                       type="text"
+                      disabled={userRole === 'user'}
                       value={formatNumberInput(incomeTarget)}
                       onChange={(e) => setIncomeTarget(e.target.value.replace(/\D/g, ''))}
-                      className="w-full px-4 py-3 rounded-xl glass-input text-lg font-bold"
+                      className="w-full px-4 py-3 rounded-xl glass-input text-lg font-bold disabled:opacity-60 disabled:cursor-not-allowed"
                       placeholder="Ví dụ: 15,000,000"
                     />
                     <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-slate-500 font-semibold">VND</div>
@@ -279,9 +281,10 @@ export default function BudgetSettings({
                   <div className="relative rounded-lg shadow-sm">
                     <input
                       type="text"
+                      disabled={userRole === 'user'}
                       value={formatNumberInput(expenseLimit)}
                       onChange={(e) => setExpenseLimit(e.target.value.replace(/\D/g, ''))}
-                      className="w-full px-4 py-3 rounded-xl glass-input text-lg font-bold"
+                      className="w-full px-4 py-3 rounded-xl glass-input text-lg font-bold disabled:opacity-60 disabled:cursor-not-allowed"
                       placeholder="Ví dụ: 10,000,000"
                     />
                     <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-slate-500 font-semibold">VND</div>
@@ -298,12 +301,14 @@ export default function BudgetSettings({
                   </div>
                 )}
 
-                <button
-                  type="submit"
-                  className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-650 hover:from-purple-550 hover:to-indigo-600 text-white font-semibold transition cursor-pointer text-sm shadow-md flex items-center justify-center gap-2 border border-purple-500/20 shimmer-btn"
-                >
-                  <Save className="w-4 h-4" /> Lưu Cấu Hình Ngân Sách
-                </button>
+                {userRole !== 'user' && (
+                  <button
+                    type="submit"
+                    className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-650 hover:from-purple-550 hover:to-indigo-600 text-white font-semibold transition cursor-pointer text-sm shadow-md flex items-center justify-center gap-2 border border-purple-500/20 shimmer-btn"
+                  >
+                    <Save className="w-4 h-4" /> Lưu Cấu Hình Ngân Sách
+                  </button>
+                )}
               </form>
             </div>
           )}
@@ -316,38 +321,40 @@ export default function BudgetSettings({
               </h3>
 
               {/* Add category form */}
-              <form onSubmit={handleAddCategorySubmit} className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-950 p-4 rounded-xl border border-slate-900/60">
-                <div>
-                  <label className="block text-[10px] font-semibold text-slate-450 uppercase tracking-wider mb-1">Loại danh mục</label>
-                  <select
-                    value={newCatType}
-                    onChange={(e) => setNewCatType(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg glass-input text-xs font-medium"
-                  >
-                    <option value="expense" className="bg-slate-900">Chi tiêu (Tiền ra)</option>
-                    <option value="income" className="bg-slate-900">Thu nhập (Tiền vào)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-semibold text-slate-450 uppercase tracking-wider mb-1">Tên danh mục mới</label>
-                  <input
-                    type="text"
-                    required
-                    value={newCatName}
-                    onChange={(e) => setNewCatName(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg glass-input text-xs font-medium"
-                    placeholder="Ví dụ: Nuôi thú cưng, Sách..."
-                  />
-                </div>
-                <div className="flex items-end">
-                  <button
-                    type="submit"
-                    className="w-full py-2 px-4 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold transition cursor-pointer text-xs flex items-center justify-center gap-1.5 shadow-md"
-                  >
-                    <Plus className="w-4 h-4" /> Thêm danh mục
-                  </button>
-                </div>
-              </form>
+              {userRole !== 'user' && (
+                <form onSubmit={handleAddCategorySubmit} className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-950 p-4 rounded-xl border border-slate-900/60">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-450 uppercase tracking-wider mb-1">Loại danh mục</label>
+                    <select
+                      value={newCatType}
+                      onChange={(e) => setNewCatType(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg glass-input text-xs font-medium"
+                    >
+                      <option value="expense" className="bg-slate-900">Chi tiêu (Tiền ra)</option>
+                      <option value="income" className="bg-slate-900">Thu nhập (Tiền vào)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-450 uppercase tracking-wider mb-1">Tên danh mục mới</label>
+                    <input
+                      type="text"
+                      required
+                      value={newCatName}
+                      onChange={(e) => setNewCatName(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg glass-input text-xs font-medium"
+                      placeholder="Ví dụ: Nuôi thú cưng, Sách..."
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <button
+                      type="submit"
+                      className="w-full py-2 px-4 rounded-lg bg-purple-650 hover:bg-purple-550 text-white font-semibold transition cursor-pointer text-xs flex items-center justify-center gap-1.5 shadow-md"
+                    >
+                      <Plus className="w-4 h-4" /> Thêm danh mục
+                    </button>
+                  </div>
+                </form>
+              )}
 
               {catMessage && (
                 <div className={`p-3 rounded-xl text-xs font-semibold border ${
@@ -366,17 +373,19 @@ export default function BudgetSettings({
                     {categories.expense.map(cat => (
                       <div key={cat} className="flex justify-between items-center bg-slate-900/30 border border-slate-900/50 p-2.5 rounded-xl hover:border-slate-800 transition duration-150 text-xs">
                         <span className="font-semibold text-slate-200">{cat}</span>
-                        <button
-                          onClick={() => {
-                            if (confirm(`Bạn có chắc muốn xóa danh mục chi tiêu "${cat}" không?`)) {
-                              onDeleteCategory('expense', cat);
-                            }
-                          }}
-                          className="text-slate-500 hover:text-red-400 p-1 rounded hover:bg-slate-800 transition"
-                          title="Xóa danh mục"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {userRole !== 'user' && (
+                          <button
+                            onClick={() => {
+                              if (confirm(`Bạn có chắc muốn xóa danh mục chi tiêu "${cat}" không?`)) {
+                                onDeleteCategory('expense', cat);
+                              }
+                            }}
+                            className="text-slate-500 hover:text-red-400 p-1 rounded hover:bg-slate-800 transition"
+                            title="Xóa danh mục"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -389,17 +398,19 @@ export default function BudgetSettings({
                     {categories.income.map(cat => (
                       <div key={cat} className="flex justify-between items-center bg-slate-900/30 border border-slate-900/50 p-2.5 rounded-xl hover:border-slate-800 transition duration-150 text-xs">
                         <span className="font-semibold text-slate-200">{cat}</span>
-                        <button
-                          onClick={() => {
-                            if (confirm(`Bạn có chắc muốn xóa danh mục thu nhập "${cat}" không?`)) {
-                              onDeleteCategory('income', cat);
-                            }
-                          }}
-                          className="text-slate-500 hover:text-red-400 p-1 rounded hover:bg-slate-800 transition"
-                          title="Xóa danh mục"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {userRole !== 'user' && (
+                          <button
+                            onClick={() => {
+                              if (confirm(`Bạn có chắc muốn xóa danh mục thu nhập "${cat}" không?`)) {
+                                onDeleteCategory('income', cat);
+                              }
+                            }}
+                            className="text-slate-500 hover:text-red-400 p-1 rounded hover:bg-slate-850 transition cursor-pointer"
+                            title="Xóa danh mục"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -416,123 +427,125 @@ export default function BudgetSettings({
               </h3>
 
               {/* Form to add schedule */}
-              <form onSubmit={handleRecurringSubmit} className="space-y-4 bg-slate-950 p-5 rounded-2xl border border-slate-900/60">
-                <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">Thiết lập lịch chi tiêu/thu tiền mới</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {/* Selector type */}
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-450 uppercase tracking-wider mb-1">Loại định kỳ</label>
-                    <select
-                      value={recType}
-                      onChange={(e) => {
-                        setRecType(e.target.value);
-                        setRecCategory(e.target.value === 'income' ? categories.income[0] : categories.expense[0]);
-                      }}
-                      className="w-full px-3 py-2 rounded-lg glass-input text-xs font-semibold"
-                    >
-                      <option value="expense" className="bg-slate-900">Chi định kỳ (Tiền ra)</option>
-                      <option value="income" className="bg-slate-900">Thu định kỳ (Tiền vào)</option>
-                    </select>
-                  </div>
-
-                  {/* Amount */}
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-450 uppercase tracking-wider mb-1">Số tiền (VND)</label>
-                    <input
-                      type="text"
-                      required
-                      value={formatNumberInput(recAmount)}
-                      onChange={(e) => setRecAmount(e.target.value.replace(/\D/g, ''))}
-                      className="w-full px-3 py-2 rounded-lg glass-input text-xs font-semibold"
-                      placeholder="100,000"
-                    />
-                  </div>
-
-                  {/* Category */}
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-450 uppercase tracking-wider mb-1">Danh mục</label>
-                    <select
-                      value={recCategory}
-                      onChange={(e) => setRecCategory(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg glass-input text-xs font-semibold"
-                    >
-                      {recType === 'expense'
-                        ? categories.expense.map(c => <option key={c} value={c} className="bg-slate-900">{c}</option>)
-                        : categories.income.map(c => <option key={c} value={c} className="bg-slate-900">{c}</option>)
-                      }
-                    </select>
-                  </div>
-
-                  {/* Frequency */}
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-450 uppercase tracking-wider mb-1">Tần suất</label>
-                    <select
-                      value={recFrequency}
-                      onChange={(e) => setRecFrequency(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg glass-input text-xs font-semibold"
-                    >
-                      <option value="daily" className="bg-slate-900">Hàng ngày</option>
-                      <option value="weekly" className="bg-slate-900">Hàng tuần</option>
-                      <option value="monthly" className="bg-slate-900">Hàng tháng</option>
-                    </select>
-                  </div>
-
-                  {/* Day picker depends on frequency */}
-                  {recFrequency !== 'daily' && (
+              {userRole !== 'user' && (
+                <form onSubmit={handleRecurringSubmit} className="space-y-4 bg-slate-950 p-5 rounded-2xl border border-slate-900/60">
+                  <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">Thiết lập lịch chi tiêu/thu tiền mới</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {/* Selector type */}
                     <div>
-                      <label className="block text-[10px] font-semibold text-slate-450 uppercase tracking-wider mb-1">
-                        {recFrequency === 'weekly' ? 'Chọn thứ' : 'Chọn ngày trong tháng (1-31)'}
-                      </label>
-                      {recFrequency === 'weekly' ? (
-                        <select
-                          value={recDayOfPeriod}
-                          onChange={(e) => setRecDayOfPeriod(Number(e.target.value))}
-                          className="w-full px-3 py-2 rounded-lg glass-input text-xs font-semibold"
-                        >
-                          <option value={1} className="bg-slate-900">Thứ Hai</option>
-                          <option value={2} className="bg-slate-900">Thứ Ba</option>
-                          <option value={3} className="bg-slate-900">Thứ Tư</option>
-                          <option value={4} className="bg-slate-900">Thứ Năm</option>
-                          <option value={5} className="bg-slate-900">Thứ Sáu</option>
-                          <option value={6} className="bg-slate-900">Thứ Bảy</option>
-                          <option value={0} className="bg-slate-900">Chủ Nhật</option>
-                        </select>
-                      ) : (
-                        <input
-                          type="number"
-                          min={1}
-                          max={31}
-                          required
-                          value={recDayOfPeriod}
-                          onChange={(e) => setRecDayOfPeriod(Math.max(1, Math.min(31, Number(e.target.value))))}
-                          className="w-full px-3 py-2 rounded-lg glass-input text-xs font-semibold"
-                        />
-                      )}
+                      <label className="block text-[10px] font-semibold text-slate-455 uppercase tracking-wider mb-1">Loại định kỳ</label>
+                      <select
+                        value={recType}
+                        onChange={(e) => {
+                          setRecType(e.target.value);
+                          setRecCategory(e.target.value === 'income' ? categories.income[0] : categories.expense[0]);
+                        }}
+                        className="w-full px-3 py-2 rounded-lg glass-input text-xs font-semibold"
+                      >
+                        <option value="expense" className="bg-slate-900">Chi định kỳ (Tiền ra)</option>
+                        <option value="income" className="bg-slate-900">Thu định kỳ (Tiền vào)</option>
+                      </select>
                     </div>
-                  )}
 
-                  {/* Note */}
-                  <div className={recFrequency === 'daily' ? 'lg:col-span-2' : ''}>
-                    <label className="block text-[10px] font-semibold text-slate-455 uppercase tracking-wider mb-1">Ghi chú lịch</label>
-                    <input
-                      type="text"
-                      value={recNote}
-                      onChange={(e) => setRecNote(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg glass-input text-xs font-medium"
-                      placeholder="Ví dụ: Đóng tiền mạng FPT, Đóng tiền nhà..."
-                    />
+                    {/* Amount */}
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-455 uppercase tracking-wider mb-1">Số tiền (VND)</label>
+                      <input
+                        type="text"
+                        required
+                        value={formatNumberInput(recAmount)}
+                        onChange={(e) => setRecAmount(e.target.value.replace(/\D/g, ''))}
+                        className="w-full px-3 py-2 rounded-lg glass-input text-xs font-semibold"
+                        placeholder="100,000"
+                      />
+                    </div>
+
+                    {/* Category */}
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-455 uppercase tracking-wider mb-1">Danh mục</label>
+                      <select
+                        value={recCategory}
+                        onChange={(e) => setRecCategory(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg glass-input text-xs font-semibold"
+                      >
+                        {recType === 'expense'
+                          ? categories.expense.map(c => <option key={c} value={c} className="bg-slate-900">{c}</option>)
+                          : categories.income.map(c => <option key={c} value={c} className="bg-slate-900">{c}</option>)
+                        }
+                      </select>
+                    </div>
+
+                    {/* Frequency */}
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-455 uppercase tracking-wider mb-1">Tần suất</label>
+                      <select
+                        value={recFrequency}
+                        onChange={(e) => setRecFrequency(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg glass-input text-xs font-semibold"
+                      >
+                        <option value="daily" className="bg-slate-900">Hàng ngày</option>
+                        <option value="weekly" className="bg-slate-900">Hàng tuần</option>
+                        <option value="monthly" className="bg-slate-900">Hàng tháng</option>
+                      </select>
+                    </div>
+
+                    {/* Day picker depends on frequency */}
+                    {recFrequency !== 'daily' && (
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-455 uppercase tracking-wider mb-1">
+                          {recFrequency === 'weekly' ? 'Chọn thứ' : 'Chọn ngày trong tháng (1-31)'}
+                        </label>
+                        {recFrequency === 'weekly' ? (
+                          <select
+                            value={recDayOfPeriod}
+                            onChange={(e) => setRecDayOfPeriod(Number(e.target.value))}
+                            className="w-full px-3 py-2 rounded-lg glass-input text-xs font-semibold"
+                          >
+                            <option value={1} className="bg-slate-900">Thứ Hai</option>
+                            <option value={2} className="bg-slate-900">Thứ Ba</option>
+                            <option value={3} className="bg-slate-900">Thứ Tư</option>
+                            <option value={4} className="bg-slate-900">Thứ Năm</option>
+                            <option value={5} className="bg-slate-900">Thứ Sáu</option>
+                            <option value={6} className="bg-slate-900">Thứ Bảy</option>
+                            <option value={0} className="bg-slate-900">Chủ Nhật</option>
+                          </select>
+                        ) : (
+                          <input
+                            type="number"
+                            min={1}
+                            max={31}
+                            required
+                            value={recDayOfPeriod}
+                            onChange={(e) => setRecDayOfPeriod(Math.max(1, Math.min(31, Number(e.target.value))))}
+                            className="w-full px-3 py-2 rounded-lg glass-input text-xs font-semibold"
+                          />
+                        )}
+                      </div>
+                    )}
+
+                    {/* Note */}
+                    <div className={recFrequency === 'daily' ? 'lg:col-span-2' : ''}>
+                      <label className="block text-[10px] font-semibold text-slate-455 uppercase tracking-wider mb-1">Ghi chú lịch</label>
+                      <input
+                        type="text"
+                        value={recNote}
+                        onChange={(e) => setRecNote(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg glass-input text-xs font-medium"
+                        placeholder="Ví dụ: Đóng tiền mạng FPT, Đóng tiền nhà..."
+                      />
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex justify-end pt-2">
-                  <button
-                    type="submit"
-                    className="py-2.5 px-6 rounded-xl bg-purple-600 hover:bg-purple-550 text-white font-semibold transition cursor-pointer text-xs flex items-center gap-1.5 shadow-md shadow-purple-500/10 border border-purple-500/20"
-                  >
-                    <Plus className="w-4 h-4" /> Kích Hoạt Định Kỳ
-                  </button>
-                </div>
-              </form>
+                  <div className="flex justify-end pt-2">
+                    <button
+                      type="submit"
+                      className="py-2.5 px-6 rounded-xl bg-purple-650 hover:bg-purple-550 text-white font-semibold transition cursor-pointer text-xs flex items-center gap-1.5 shadow-md shadow-purple-500/10 border border-purple-500/20"
+                    >
+                      <Plus className="w-4 h-4" /> Kích Hoạt Định Kỳ
+                    </button>
+                  </div>
+                </form>
+              )}
 
               {/* Show active lists */}
               <div className="space-y-3">
@@ -567,17 +580,19 @@ export default function BudgetSettings({
                           <span className={`font-bold font-heading text-sm ${item.type === 'expense' ? 'text-rose-450' : 'text-emerald-450'}`}>
                             {item.type === 'expense' ? '-' : '+'}{formatVND(item.amount)}
                           </span>
-                          <button
-                            onClick={() => {
-                              if (confirm(`Bạn có muốn hủy lịch định kỳ "${item.note}" không?`)) {
-                                onDeleteRecurring(item.id);
-                              }
-                            }}
-                            className="text-slate-500 hover:text-red-400 p-1.5 rounded hover:bg-slate-800 transition"
-                            title="Xóa lịch"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          {userRole !== 'user' && (
+                            <button
+                              onClick={() => {
+                                if (confirm(`Bạn có muốn hủy lịch định kỳ "${item.note}" không?`)) {
+                                  onDeleteRecurring(item.id);
+                                }
+                              }}
+                              className="text-slate-500 hover:text-red-400 p-1.5 rounded hover:bg-slate-800 transition"
+                              title="Xóa lịch"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     );

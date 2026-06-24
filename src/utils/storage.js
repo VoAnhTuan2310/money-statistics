@@ -4,8 +4,15 @@ const KEYS = {
   BUDGET: 'fintrack_budget',
   SAVINGS_POTS: 'fintrack_savings_pots',
   USERS: 'fintrack_users',
-  GEMINI_API_KEY: 'fintrack_gemini_api_key'
+  GEMINI_API_KEY: 'fintrack_gemini_api_key',
+  WALLETS: 'fintrack_wallets'
 };
+
+const DEFAULT_WALLETS = [
+  { id: 'wallet-cash', name: 'Tiền mặt', balance: 0, type: 'cash', isDefault: true },
+  { id: 'wallet-bank', name: 'Tài khoản ngân hàng', balance: 0, type: 'bank', isDefault: true },
+  { id: 'wallet-other', name: 'Tiền khác', balance: 0, type: 'other', isDefault: true }
+];
 
 // Initial Default Values
 const DEFAULT_BUDGET = {
@@ -95,6 +102,13 @@ const setJSON = (key, value) => {
   }
 };
 
+export const getLocalDateString = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 // --- Authentication & User Scoping Helpers ---
 export const getActiveUser = () => {
   return localStorage.getItem('fintrack_active_user') || '';
@@ -109,7 +123,30 @@ export const setActiveUser = (username) => {
 };
 
 export const getUsers = () => {
-  return getJSON(KEYS.USERS, []);
+  const users = getJSON(KEYS.USERS, []);
+  if (users.length === 0) {
+    const defaultAdmin = { username: 'admin', password: 'admin', role: 'admin' };
+    setJSON(KEYS.USERS, [defaultAdmin]);
+    return [defaultAdmin];
+  }
+  const hasAdmin = users.some(u => u.role === 'admin');
+  if (!hasAdmin) {
+    const adminUser = users.find(u => u.username.toLowerCase() === 'admin');
+    if (adminUser) {
+      adminUser.role = 'admin';
+    } else {
+      users.push({ username: 'admin', password: 'admin', role: 'admin' });
+    }
+    setJSON(KEYS.USERS, users);
+  }
+  return users;
+};
+
+export const getUserRole = (username) => {
+  const users = getUsers();
+  const normalized = username.trim().toLowerCase();
+  const user = users.find(u => u.username.toLowerCase() === normalized);
+  return user ? (user.role || 'user') : 'user';
 };
 
 export const registerUser = (username, password) => {
@@ -119,7 +156,7 @@ export const registerUser = (username, password) => {
   if (exists) {
     return { success: false, error: 'Tên tài khoản đã tồn tại!' };
   }
-  users.push({ username: normalized, password });
+  users.push({ username: normalized, password, role: 'user' });
   setJSON(KEYS.USERS, users);
   return { success: true };
 };
@@ -132,7 +169,7 @@ export const loginUser = (username, password) => {
     return { success: false, error: 'Tài khoản hoặc mật khẩu không chính xác!' };
   }
   setActiveUser(user.username);
-  return { success: true, username: user.username };
+  return { success: true, username: user.username, role: user.role || 'user' };
 };
 
 export const logoutUser = () => {
@@ -151,6 +188,128 @@ export const changeUserPassword = (username, newPassword) => {
   return { success: true };
 };
 
+export const adminCreateUser = (username, password, role) => {
+  const users = getUsers();
+  const normalized = username.trim();
+  if (!normalized) return { success: false, error: 'Tên tài khoản không được để trống!' };
+  const exists = users.some(u => u.username.toLowerCase() === normalized.toLowerCase());
+  if (exists) {
+    return { success: false, error: 'Tên tài khoản đã tồn tại!' };
+  }
+  users.push({ username: normalized, password, role: role || 'user' });
+  setJSON(KEYS.USERS, users);
+  return { success: true };
+};
+
+export const adminUpdateUserRole = (username, role) => {
+  const users = getUsers();
+  const normalized = username.trim().toLowerCase();
+  const index = users.findIndex(u => u.username.toLowerCase() === normalized);
+  if (index === -1) return { success: false, error: 'Tài khoản không tồn tại!' };
+  
+  if (users[index].role === 'admin' && role !== 'admin') {
+    const adminCount = users.filter(u => u.role === 'admin').length;
+    if (adminCount <= 1) {
+      return { success: false, error: 'Không thể hạ quyền của tài khoản Admin duy nhất!' };
+    }
+  }
+  
+  users[index].role = role;
+  setJSON(KEYS.USERS, users);
+  return { success: true };
+};
+
+export const adminDeleteUser = (username) => {
+  const users = getUsers();
+  const normalized = username.trim().toLowerCase();
+  const index = users.findIndex(u => u.username.toLowerCase() === normalized);
+  if (index === -1) return { success: false, error: 'Tài khoản không tồn tại!' };
+  
+  if (users[index].role === 'admin') {
+    const adminCount = users.filter(u => u.role === 'admin').length;
+    if (adminCount <= 1) {
+      return { success: false, error: 'Không thể xóa tài khoản Admin duy nhất!' };
+    }
+  }
+  
+  const targetUsername = users[index].username;
+  const filteredUsers = users.filter(u => u.username.toLowerCase() !== normalized);
+  setJSON(KEYS.USERS, filteredUsers);
+  
+  clearUserData(targetUsername);
+  
+  return { success: true };
+};
+
+export const adminResetPassword = (username, password) => {
+  const users = getUsers();
+  const normalized = username.trim().toLowerCase();
+  const index = users.findIndex(u => u.username.toLowerCase() === normalized);
+  if (index === -1) return { success: false, error: 'Tài khoản không tồn tại!' };
+  
+  users[index].password = password;
+  setJSON(KEYS.USERS, users);
+  return { success: true };
+};
+
+export const exportSystemDatabase = () => {
+  const data = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key.startsWith('fintrack_')) {
+      try {
+        data[key] = JSON.parse(localStorage.getItem(key));
+      } catch (e) {
+        data[key] = localStorage.getItem(key);
+      }
+    }
+  }
+  
+  const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(data, null, 2))}`;
+  const downloadAnchor = document.createElement('a');
+  downloadAnchor.setAttribute('href', jsonString);
+  downloadAnchor.setAttribute('download', `fintrack_system_backup_${new Date().toISOString().split('T')[0]}.json`);
+  document.body.appendChild(downloadAnchor);
+  downloadAnchor.click();
+  downloadAnchor.remove();
+};
+
+export const importSystemDatabase = (jsonData) => {
+  try {
+    const data = JSON.parse(jsonData);
+    const keys = Object.keys(data);
+    const hasUsers = keys.some(k => k === KEYS.USERS);
+    if (!hasUsers) {
+      return { success: false, error: 'Tệp sao lưu không hợp lệ hoặc thiếu thông tin người dùng!' };
+    }
+    
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key.startsWith('fintrack_') && key !== 'fintrack_active_user') {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+    
+    Object.entries(data).forEach(([key, val]) => {
+      if (key !== 'fintrack_active_user') {
+        if (typeof val === 'object') {
+          localStorage.setItem(key, JSON.stringify(val));
+        } else {
+          localStorage.setItem(key, val);
+        }
+      }
+    });
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error importing system database:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+
 export const clearUserData = (username) => {
   const normalized = username.trim();
   localStorage.removeItem(`${KEYS.TRANSACTIONS}_${normalized}`);
@@ -158,6 +317,7 @@ export const clearUserData = (username) => {
   localStorage.removeItem(`${KEYS.SAVINGS_POTS}_${normalized}`);
   localStorage.removeItem(`fintrack_categories_${normalized}`);
   localStorage.removeItem(`fintrack_recurring_${normalized}`);
+  localStorage.removeItem(`${KEYS.WALLETS}_${normalized}`);
   return { success: true };
 };
 
@@ -230,7 +390,7 @@ export const addRecurringTransaction = (item) => {
     ...item,
     id: `rec-${Date.now()}`,
     amount: Number(item.amount) || 0,
-    lastProcessedDate: new Date().toISOString().split('T')[0]
+    lastProcessedDate: getLocalDateString()
   };
   list.push(newItem);
   saveRecurringTransactions(list);
@@ -253,7 +413,7 @@ export const processRecurringTransactions = (username) => {
   const transactionsKey = `${KEYS.TRANSACTIONS}_${username}`;
   const txs = getJSON(transactionsKey, DEFAULT_TRANSACTIONS);
   
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalDateString();
   const today = new Date(todayStr);
   
   let updatedRecurring = [...recurringList];
@@ -276,7 +436,7 @@ export const processRecurringTransactions = (username) => {
     for (let i = 1; i <= diffDays; i++) {
       const genDate = new Date(lastDate);
       genDate.setDate(lastDate.getDate() + i);
-      const genDateStr = genDate.toISOString().split('T')[0];
+      const genDateStr = getLocalDateString(genDate);
 
       let isDue = false;
       if (item.frequency === 'daily') {
@@ -526,4 +686,75 @@ export const saveGeminiApiKey = (key) => {
     localStorage.removeItem(`${KEYS.GEMINI_API_KEY}_${username}`);
   }
   return true;
+};
+
+// --- Wallets API ---
+export const getWallets = () => {
+  const username = getActiveUser();
+  if (!username) return [];
+  const key = `${KEYS.WALLETS}_${username}`;
+  const wallets = getJSON(key, null);
+  if (wallets === null) {
+    setJSON(key, DEFAULT_WALLETS);
+    return DEFAULT_WALLETS;
+  }
+  return wallets;
+};
+
+export const saveWallets = (wallets) => {
+  const username = getActiveUser();
+  if (!username) return false;
+  const key = `${KEYS.WALLETS}_${username}`;
+  return setJSON(key, wallets);
+};
+
+export const addWallet = (wallet) => {
+  const wallets = getWallets();
+  const newWallet = {
+    ...wallet,
+    id: `wallet-${Date.now()}`,
+    balance: Number(wallet.balance) || 0,
+    isDefault: false
+  };
+  wallets.push(newWallet);
+  saveWallets(wallets);
+  return newWallet;
+};
+
+export const updateWalletBalance = (id, balance) => {
+  const wallets = getWallets();
+  const updated = wallets.map(w => {
+    if (w.id === id) {
+      return { ...w, balance: Number(balance) || 0 };
+    }
+    return w;
+  });
+  saveWallets(updated);
+  return updated;
+};
+
+export const updateWallet = (id, data) => {
+  const wallets = getWallets();
+  const updated = wallets.map(w => {
+    if (w.id === id) {
+      return { 
+        ...w, 
+        name: data.name !== undefined ? data.name : w.name,
+        balance: data.balance !== undefined ? (Number(data.balance) || 0) : w.balance,
+        type: data.type !== undefined ? data.type : w.type
+      };
+    }
+    return w;
+  });
+  saveWallets(updated);
+  return updated;
+};
+
+
+export const deleteWallet = (id) => {
+  const wallets = getWallets();
+  if (wallets.length <= 1) return wallets; // Không cho phép xóa ví cuối cùng
+  const filtered = wallets.filter(w => w.id !== id);
+  saveWallets(filtered);
+  return filtered;
 };

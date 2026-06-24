@@ -12,8 +12,10 @@ import {
   X,
   Wallet,
   User,
+  Users,
   LogOut,
-  Sparkles
+  Sparkles,
+  Calendar
 } from 'lucide-react';
 import { 
   getTransactions, 
@@ -30,6 +32,7 @@ import {
   importData, 
   getActiveUser,
   logoutUser,
+  getUserRole,
   getUserCategories,
   addUserCategory,
   deleteUserCategory,
@@ -39,7 +42,13 @@ import {
   processRecurringTransactions,
   clearUserData,
   getGeminiApiKey,
-  saveGeminiApiKey
+  saveGeminiApiKey,
+  getWallets,
+  saveWallets,
+  addWallet,
+  updateWalletBalance,
+  updateWallet,
+  deleteWallet
 } from './utils/storage';
 
 import Dashboard from './components/Dashboard';
@@ -48,7 +57,10 @@ import Savings from './components/Savings';
 import BudgetSettings from './components/BudgetSettings';
 import FinancialTips from './components/FinancialTips';
 import AiAssistant from './components/AiAssistant';
+import Wallets from './components/Wallets';
 import Login from './components/Login';
+import DailyTransactions from './components/DailyTransactions';
+import AccountManager from './components/AccountManager';
 
 export default function App() {
   const [transactions, setTransactions] = useState([]);
@@ -60,9 +72,11 @@ export default function App() {
   const [categories, setCategories] = useState({ income: [], expense: [] });
   const [recurringList, setRecurringList] = useState([]);
   const [geminiKey, setGeminiKey] = useState('');
+  const [wallets, setWallets] = useState([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeUser, setActiveUser] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [userRole, setUserRole] = useState('user');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [stars, setStars] = useState([]);
 
@@ -72,6 +86,7 @@ export default function App() {
     if (username) {
       setIsAuthenticated(true);
       setActiveUser(username);
+      setUserRole(getUserRole(username));
       
       setTransactions(getTransactions());
       setBudget(getBudget());
@@ -79,6 +94,7 @@ export default function App() {
       setCategories(getUserCategories());
       setRecurringList(getRecurringTransactions());
       setGeminiKey(getGeminiApiKey());
+      setWallets(getWallets());
 
       // Auto-process recurring transactions on load
       setTimeout(() => {
@@ -109,6 +125,7 @@ export default function App() {
     const username = getActiveUser();
     setIsAuthenticated(true);
     setActiveUser(username);
+    setUserRole(getUserRole(username));
     
     setTransactions(getTransactions());
     setBudget(getBudget());
@@ -116,6 +133,7 @@ export default function App() {
     setCategories(getUserCategories());
     setRecurringList(getRecurringTransactions());
     setGeminiKey(getGeminiApiKey());
+    setWallets(getWallets());
 
     // Auto-process recurring transactions immediately after login
     setTimeout(() => {
@@ -130,15 +148,81 @@ export default function App() {
 
   const handleAddTransaction = (tx) => {
     addTransaction(tx);
+    
+    // Update associated wallet balance
+    const walletId = tx.walletId || (wallets.length > 0 ? wallets[0].id : null);
+    if (walletId) {
+      const updatedWallets = wallets.map(w => {
+        if (w.id === walletId) {
+          const change = tx.type === 'income' ? tx.amount : -tx.amount;
+          return { ...w, balance: w.balance + change };
+        }
+        return w;
+      });
+      setWallets(updatedWallets);
+      saveWallets(updatedWallets);
+    }
+    
     setTransactions(getTransactions());
   };
 
   const handleDeleteTransaction = (id) => {
+    // Find transaction to know its details before deleting
+    const tx = transactions.find(t => t.id === id);
+    if (tx) {
+      const walletId = tx.walletId || (wallets.length > 0 ? wallets[0].id : null);
+      if (walletId) {
+        const updatedWallets = wallets.map(w => {
+          if (w.id === walletId) {
+            // Reverse transaction effect
+            const change = tx.type === 'income' ? -tx.amount : tx.amount;
+            return { ...w, balance: w.balance + change };
+          }
+          return w;
+        });
+        setWallets(updatedWallets);
+        saveWallets(updatedWallets);
+      }
+    }
+    
     deleteTransaction(id);
     setTransactions(getTransactions());
   };
 
   const handleUpdateTransaction = (tx) => {
+    const oldTx = transactions.find(t => t.id === tx.id);
+    if (oldTx) {
+      const oldWalletId = oldTx.walletId || (wallets.length > 0 ? wallets[0].id : null);
+      const newWalletId = tx.walletId || (wallets.length > 0 ? wallets[0].id : null);
+      
+      let updatedWallets = [...wallets];
+      
+      // Reverse old transaction
+      if (oldWalletId) {
+        updatedWallets = updatedWallets.map(w => {
+          if (w.id === oldWalletId) {
+            const change = oldTx.type === 'income' ? -oldTx.amount : oldTx.amount;
+            return { ...w, balance: w.balance + change };
+          }
+          return w;
+        });
+      }
+      
+      // Apply new transaction
+      if (newWalletId) {
+        updatedWallets = updatedWallets.map(w => {
+          if (w.id === newWalletId) {
+            const change = tx.type === 'income' ? tx.amount : -tx.amount;
+            return { ...w, balance: w.balance + change };
+          }
+          return w;
+        });
+      }
+      
+      setWallets(updatedWallets);
+      saveWallets(updatedWallets);
+    }
+    
     updateTransaction(tx);
     setTransactions(getTransactions());
   };
@@ -194,13 +278,35 @@ export default function App() {
     setGeminiKey(getGeminiApiKey());
   };
 
+  const handleAddWallet = (wallet) => {
+    addWallet(wallet);
+    setWallets(getWallets());
+  };
+
+  const handleUpdateWalletBalance = (id, balance) => {
+    updateWalletBalance(id, balance);
+    setWallets(getWallets());
+  };
+
+  const handleUpdateWallet = (id, data) => {
+    updateWallet(id, data);
+    setWallets(getWallets());
+  };
+
+  const handleDeleteWallet = (id) => {
+    deleteWallet(id);
+    setWallets(getWallets());
+  };
+
   const handleClearUserData = () => {
     clearUserData(activeUser);
     saveGeminiApiKey('');
     setGeminiKey('');
+    setWallets([]);
     logoutUser();
     setIsAuthenticated(false);
     setActiveUser('');
+    setUserRole('user');
     setActiveTab('dashboard');
     alert('Đã xóa sạch toàn bộ dữ liệu tài khoản và đăng xuất!');
   };
@@ -232,6 +338,7 @@ export default function App() {
       logoutUser();
       setIsAuthenticated(false);
       setActiveUser('');
+      setUserRole('user');
       setActiveTab('dashboard');
     }
   };
@@ -242,10 +349,13 @@ export default function App() {
 
   const menuItems = [
     { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard },
-    { id: 'transactions', label: 'Giao dịch', icon: FileText },
+    { id: 'transactions', label: 'Lịch sử Giao dịch', icon: FileText },
+    { id: 'daily-ledger', label: 'Thu chi hàng ngày', icon: Calendar },
     { id: 'savings', label: 'Tiết kiệm', icon: PiggyBank },
+    { id: 'wallets', label: 'Ví & Tài khoản', icon: Wallet },
     { id: 'ai-assistant', label: 'Trợ lý AnhTuanAI', icon: Sparkles },
     { id: 'budget', label: 'Cấu hình & Bảo mật', icon: Settings },
+    ...(userRole === 'admin' ? [{ id: 'accounts', label: 'Quản lý tài khoản', icon: Users }] : []),
     { id: 'tips', label: 'Trợ lý tài chính', icon: Lightbulb },
   ];
 
@@ -257,8 +367,10 @@ export default function App() {
             transactions={transactions} 
             budget={budget} 
             savingsPots={savingsPots} 
+            wallets={wallets}
             onNavigate={(tab) => setActiveTab(tab)} 
             onAddTransaction={handleAddTransaction} 
+            userRole={userRole}
           />
         );
       case 'transactions':
@@ -266,9 +378,25 @@ export default function App() {
           <Transactions 
             transactions={transactions} 
             categories={categories}
+            wallets={wallets}
+            geminiKey={geminiKey}
             onAddTransaction={handleAddTransaction} 
             onDeleteTransaction={handleDeleteTransaction} 
             onUpdateTransaction={handleUpdateTransaction} 
+            userRole={userRole}
+          />
+        );
+      case 'daily-ledger':
+        return (
+          <DailyTransactions 
+            transactions={transactions} 
+            categories={categories}
+            wallets={wallets}
+            geminiKey={geminiKey}
+            onAddTransaction={handleAddTransaction} 
+            onDeleteTransaction={handleDeleteTransaction} 
+            onUpdateTransaction={handleUpdateTransaction} 
+            userRole={userRole}
           />
         );
       case 'savings':
@@ -276,10 +404,23 @@ export default function App() {
           <Savings 
             pots={savingsPots} 
             transactions={transactions} 
+            wallets={wallets}
             onAddPot={handleAddPot} 
             onDeletePot={handleDeletePot} 
             onUpdatePot={handleUpdatePot} 
             onAddTransaction={handleAddTransaction} 
+            userRole={userRole}
+          />
+        );
+      case 'wallets':
+        return (
+          <Wallets 
+            wallets={wallets}
+            onAddWallet={handleAddWallet}
+            onUpdateWalletBalance={handleUpdateWalletBalance}
+            onUpdateWallet={handleUpdateWallet}
+            onDeleteWallet={handleDeleteWallet}
+            userRole={userRole}
           />
         );
       case 'ai-assistant':
@@ -308,8 +449,11 @@ export default function App() {
             onDeleteRecurring={handleDeleteRecurring}
             onSaveApiKey={handleSaveApiKey}
             onClearUserData={handleClearUserData}
+            userRole={userRole}
           />
         );
+      case 'accounts':
+        return <AccountManager />;
       case 'tips':
         return (
           <FinancialTips 
@@ -455,8 +599,9 @@ export default function App() {
 
         {/* Mobile Sidebar Overlay Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden fixed inset-0 bg-slate-950/95 z-20 flex flex-col justify-between p-6 animate-in fade-in slide-in-from-top-4 duration-200">
-            <div className="space-y-6 pt-16">
+          <div className="md:hidden fixed inset-0 bg-slate-950/95 z-20 flex flex-col p-6 animate-in fade-in slide-in-from-top-4 duration-200">
+            {/* Scrollable middle container */}
+            <div className="flex-1 overflow-y-auto pt-16 pb-4 space-y-6 pr-1">
               {/* User profile */}
               <div className="glass-card flex items-center gap-3.5 p-4 rounded-2xl border border-slate-850">
                 <div className="w-10 h-10 rounded-full bg-purple-550/10 text-purple-400 border border-purple-550/20 flex items-center justify-center">
@@ -493,7 +638,8 @@ export default function App() {
               </nav>
             </div>
 
-            <div className="border-t border-slate-900 pt-6 space-y-3.5">
+            {/* Sticky/Fixed bottom action buttons */}
+            <div className="border-t border-slate-900 pt-4 space-y-3 flex-shrink-0 mt-auto">
               <div className="grid grid-cols-2 gap-3">
                 <label className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold text-slate-350 bg-slate-900 border border-slate-800 cursor-pointer btn-click-effect">
                   <Upload className="w-4 h-4" />
@@ -512,7 +658,7 @@ export default function App() {
 
               <button
                 onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold text-rose-450 bg-rose-500/5 border border-rose-500/10 cursor-pointer btn-click-effect"
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold text-rose-455 bg-rose-500/5 border border-rose-500/10 cursor-pointer btn-click-effect"
               >
                 <LogOut className="w-4 h-4" />
                 <span>Đăng xuất tài khoản</span>
@@ -529,8 +675,14 @@ export default function App() {
         </main>
 
         {/* Mobile Bottom Tabbar navigation */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 glass-panel border-t border-slate-900/60 flex justify-around py-2.5 z-10 px-2 rounded-t-2xl shadow-2xl bg-slate-950/80">
-          {menuItems.map((item) => {
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 glass-panel border-t border-slate-900/60 flex justify-around py-2 z-10 px-1 rounded-t-2xl shadow-2xl bg-slate-950/90 backdrop-blur-lg">
+          {[
+            { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard },
+            { id: 'transactions', label: 'Giao dịch', icon: FileText },
+            { id: 'daily-ledger', label: 'Thu chi', icon: Calendar },
+            { id: 'savings', label: 'Tiết kiệm', icon: PiggyBank },
+            { id: 'wallets', label: 'Ví & TK', icon: Wallet }
+          ].map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
             return (
@@ -540,12 +692,12 @@ export default function App() {
                   setActiveTab(item.id);
                   setMobileMenuOpen(false);
                 }}
-                className={`flex flex-col items-center gap-1.5 transition cursor-pointer px-3 py-1 rounded-xl btn-click-effect ${
-                  isActive ? 'text-purple-400 font-bold text-glow-purple' : 'text-slate-500 hover:text-slate-350'
+                className={`flex flex-col items-center justify-center flex-1 py-1 transition-all duration-200 cursor-pointer rounded-xl btn-click-effect ${
+                  isActive ? 'text-purple-400 font-extrabold text-glow-purple scale-105' : 'text-slate-500 hover:text-slate-350'
                 }`}
               >
-                <Icon className="w-5.5 h-5.5" />
-                <span className="text-[9px] font-semibold tracking-wide">{item.label}</span>
+                <Icon className="w-5 h-5" />
+                <span className="text-[9px] font-semibold tracking-wide mt-1">{item.label}</span>
               </button>
             );
           })}

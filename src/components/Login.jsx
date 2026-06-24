@@ -318,6 +318,15 @@ export default function Login({ onLoginSuccess }) {
           </button>
         </div>
 
+        {/* Default Admin Info */}
+        {!isRegistering && (
+          <div className="mt-6 p-3 bg-white/5 border border-white/5 rounded-xl text-[10px] text-slate-400 text-center leading-relaxed">
+            Tài khoản Admin mặc định: <strong className="text-purple-400 font-semibold">admin</strong> / Mật khẩu: <strong className="text-purple-400 font-semibold">admin</strong>
+            <br />
+            (Admin có quyền tạo/phân quyền tài khoản khác & Sao lưu đồng bộ chéo thiết bị)
+          </div>
+        )}
+
       </div>
     </div>
   );
