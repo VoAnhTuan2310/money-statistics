@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from './utils/firebase';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -30,6 +32,7 @@ import {
   updateSavingsPot,
   getActiveUser,
   logoutUser,
+  syncPullAll,
   getUserRole,
   getUserCategories,
   addUserCategory,
@@ -80,32 +83,39 @@ export default function App() {
 
   // Load state on mount
   useEffect(() => {
-    const username = getActiveUser();
-    if (username) {
-      setIsAuthenticated(true);
-      setActiveUser(username);
-      setUserRole(getUserRole(username));
-      
-      setTransactions(getTransactions());
-      setBudget(getBudget());
-      setSavingsPots(getSavingsPots());
-      setCategories(getUserCategories());
-      setRecurringList(getRecurringTransactions());
-      setGeminiKey(getGeminiApiKey());
-      setWallets(getWallets());
+    const initApp = async () => {
+      const username = getActiveUser();
+      if (username) {
+        // Sync with Firestore first before loading
+        await syncPullAll(username);
+        
+        setIsAuthenticated(true);
+        setActiveUser(username);
+        setUserRole(getUserRole(username));
+        
+        setTransactions(getTransactions());
+        setBudget(getBudget());
+        setSavingsPots(getSavingsPots());
+        setCategories(getUserCategories());
+        setRecurringList(getRecurringTransactions());
+        setGeminiKey(getGeminiApiKey());
+        setWallets(getWallets());
 
-      // Auto-process recurring transactions on load
-      setTimeout(() => {
-        const result = processRecurringTransactions(username);
-        if (result.success && result.addedCount > 0) {
-          alert(`Hệ thống AnhTuan: Đã tự động ghi nhận ${result.addedCount} giao dịch định kỳ đến hạn của bạn!`);
-          setTransactions(getTransactions());
-          setRecurringList(getRecurringTransactions());
-        }
-      }, 600);
-    } else {
-      setIsAuthenticated(false);
-    }
+        // Auto-process recurring transactions on load
+        setTimeout(() => {
+          const result = processRecurringTransactions(username);
+          if (result.success && result.addedCount > 0) {
+            alert(`Hệ thống AnhTuan: Đã tự động ghi nhận ${result.addedCount} giao dịch định kỳ đến hạn của bạn!`);
+            setTransactions(getTransactions());
+            setRecurringList(getRecurringTransactions());
+          }
+        }, 600);
+      } else {
+        setIsAuthenticated(false);
+      }
+    };
+
+    initApp();
 
     // Generate random twinkling stars across the main app background
     const generated = Array.from({ length: 35 }).map((_, i) => ({
@@ -118,6 +128,77 @@ export default function App() {
     }));
     setStars(generated);
   }, [isAuthenticated]);
+
+  // Real-time Firestore sync
+  useEffect(() => {
+    if (!isAuthenticated || !activeUser) return;
+
+    const normalized = activeUser.trim().toLowerCase();
+    const storageUsername = activeUser.trim();
+
+    // Listen to transactions document
+    const unsubTx = onSnapshot(doc(db, 'userdata_transactions', normalized), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data().data;
+        localStorage.setItem(`fintrack_transactions_${storageUsername}`, JSON.stringify(data));
+        setTransactions(data);
+      }
+    });
+
+    // Listen to wallets document
+    const unsubWallets = onSnapshot(doc(db, 'userdata_wallets', normalized), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data().data;
+        localStorage.setItem(`fintrack_wallets_${storageUsername}`, JSON.stringify(data));
+        setWallets(data);
+      }
+    });
+
+    // Listen to savings pots document
+    const unsubSavings = onSnapshot(doc(db, 'userdata_savings_pots', normalized), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data().data;
+        localStorage.setItem(`fintrack_savings_pots_${storageUsername}`, JSON.stringify(data));
+        setSavingsPots(data);
+      }
+    });
+
+    // Listen to budget document
+    const unsubBudget = onSnapshot(doc(db, 'userdata_budget', normalized), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data().data;
+        localStorage.setItem(`fintrack_budget_${storageUsername}`, JSON.stringify(data));
+        setBudget(data);
+      }
+    });
+
+    // Listen to categories document
+    const unsubCategories = onSnapshot(doc(db, 'userdata_categories', normalized), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data().data;
+        localStorage.setItem(`fintrack_categories_${storageUsername}`, JSON.stringify(data));
+        setCategories(data);
+      }
+    });
+
+    // Listen to recurring transactions document
+    const unsubRecurring = onSnapshot(doc(db, 'userdata_recurring', normalized), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data().data;
+        localStorage.setItem(`fintrack_recurring_${storageUsername}`, JSON.stringify(data));
+        setRecurringList(data);
+      }
+    });
+
+    return () => {
+      unsubTx();
+      unsubWallets();
+      unsubSavings();
+      unsubBudget();
+      unsubCategories();
+      unsubRecurring();
+    };
+  }, [isAuthenticated, activeUser]);
 
   const handleLoginSuccess = () => {
     const username = getActiveUser();
