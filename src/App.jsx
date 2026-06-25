@@ -17,7 +17,8 @@ import {
   Users,
   LogOut,
   Sparkles,
-  Calendar
+  Calendar,
+  Calculator
 } from 'lucide-react';
 import { 
   getTransactions, 
@@ -62,6 +63,7 @@ import Wallets from './components/Wallets';
 import Login from './components/Login';
 import DailyTransactions from './components/DailyTransactions';
 import AccountManager from './components/AccountManager';
+import FinancialCalculator from './components/FinancialCalculator';
 
 export default function App() {
   const [transactions, setTransactions] = useState([]);
@@ -412,6 +414,7 @@ export default function App() {
     { id: 'daily-ledger', label: 'Thu chi hàng ngày', icon: Calendar },
     { id: 'savings', label: 'Tiết kiệm', icon: PiggyBank },
     { id: 'wallets', label: 'Ví & Tài khoản', icon: Wallet },
+    { id: 'calculator', label: 'Công cụ tính toán', icon: Calculator },
     { id: 'ai-assistant', label: 'Trợ lý AnhTuanAI', icon: Sparkles },
     { id: 'budget', label: 'Cấu hình & Bảo mật', icon: Settings },
     ...(userRole === 'admin' ? [{ id: 'accounts', label: 'Quản lý tài khoản', icon: Users }] : []),
@@ -509,6 +512,12 @@ export default function App() {
             onSaveApiKey={handleSaveApiKey}
             onClearUserData={handleClearUserData}
             userRole={userRole}
+          />
+        );
+      case 'calculator':
+        return (
+          <FinancialCalculator 
+            onNavigate={(tab) => setActiveTab(tab)}
           />
         );
       case 'accounts':
