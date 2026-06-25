@@ -146,7 +146,6 @@ export default function Dashboard({ transactions, budget, savingsPots, wallets =
           <div className="flex-1 min-w-0">
             <span className="text-xs text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
               Số dư hiện tại
-              {userRole !== 'user' && (
                 <button 
                   onClick={() => onNavigate('wallets')}
                   className="text-slate-400 hover:text-indigo-400 p-0.5 rounded hover:bg-slate-900 transition cursor-pointer"
@@ -154,7 +153,6 @@ export default function Dashboard({ transactions, budget, savingsPots, wallets =
                 >
                   <Edit className="w-3.5 h-3.5" />
                 </button>
-              )}
             </span>
             <span className="text-2xl font-black text-white font-heading block truncate text-glow-purple">{formatVND(stats.activeBalance)}</span>
           </div>

@@ -265,7 +265,6 @@ export default function BudgetSettings({
                   <div className="relative rounded-lg shadow-sm">
                     <input
                       type="text"
-                      disabled={userRole === 'user'}
                       value={formatNumberInput(incomeTarget)}
                       onChange={(e) => setIncomeTarget(e.target.value.replace(/\D/g, ''))}
                       className="w-full px-4 py-3 rounded-xl glass-input text-lg font-bold disabled:opacity-60 disabled:cursor-not-allowed"
@@ -281,7 +280,6 @@ export default function BudgetSettings({
                   <div className="relative rounded-lg shadow-sm">
                     <input
                       type="text"
-                      disabled={userRole === 'user'}
                       value={formatNumberInput(expenseLimit)}
                       onChange={(e) => setExpenseLimit(e.target.value.replace(/\D/g, ''))}
                       className="w-full px-4 py-3 rounded-xl glass-input text-lg font-bold disabled:opacity-60 disabled:cursor-not-allowed"
@@ -301,18 +299,15 @@ export default function BudgetSettings({
                   </div>
                 )}
 
-                {userRole !== 'user' && (
-                  <button
-                    type="submit"
-                    className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-650 hover:from-purple-550 hover:to-indigo-600 text-white font-semibold transition cursor-pointer text-sm shadow-md flex items-center justify-center gap-2 border border-purple-500/20 shimmer-btn"
-                  >
-                    <Save className="w-4 h-4" /> Lưu Cấu Hình Ngân Sách
-                  </button>
-                )}
+                <button
+                  type="submit"
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-650 hover:from-purple-550 hover:to-indigo-600 text-white font-semibold transition cursor-pointer text-sm shadow-md flex items-center justify-center gap-2 border border-purple-500/20 shimmer-btn"
+                >
+                  <Save className="w-4 h-4" /> Lưu Cấu Hình Ngân Sách
+                </button>
               </form>
             </div>
           )}
-
           {/* TAB 2: CUSTOM CATEGORIES */}
           {activeSubTab === 'categories' && categories && (
             <div className="glass-panel p-6 rounded-2xl shadow-xl space-y-6">
@@ -321,40 +316,38 @@ export default function BudgetSettings({
               </h3>
 
               {/* Add category form */}
-              {userRole !== 'user' && (
-                <form onSubmit={handleAddCategorySubmit} className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-950 p-4 rounded-xl border border-slate-900/60">
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-450 uppercase tracking-wider mb-1">Loại danh mục</label>
-                    <select
-                      value={newCatType}
-                      onChange={(e) => setNewCatType(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg glass-input text-xs font-medium"
-                    >
-                      <option value="expense" className="bg-slate-900">Chi tiêu (Tiền ra)</option>
-                      <option value="income" className="bg-slate-900">Thu nhập (Tiền vào)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-450 uppercase tracking-wider mb-1">Tên danh mục mới</label>
-                    <input
-                      type="text"
-                      required
-                      value={newCatName}
-                      onChange={(e) => setNewCatName(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg glass-input text-xs font-medium"
-                      placeholder="Ví dụ: Nuôi thú cưng, Sách..."
-                    />
-                  </div>
-                  <div className="flex items-end">
-                    <button
-                      type="submit"
-                      className="w-full py-2 px-4 rounded-lg bg-purple-650 hover:bg-purple-550 text-white font-semibold transition cursor-pointer text-xs flex items-center justify-center gap-1.5 shadow-md"
-                    >
-                      <Plus className="w-4 h-4" /> Thêm danh mục
-                    </button>
-                  </div>
-                </form>
-              )}
+              <form onSubmit={handleAddCategorySubmit} className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-950 p-4 rounded-xl border border-slate-900/60">
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-455 uppercase tracking-wider mb-1">Loại danh mục</label>
+                  <select
+                    value={newCatType}
+                    onChange={(e) => setNewCatType(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg glass-input text-xs font-medium"
+                  >
+                    <option value="expense" className="bg-slate-900">Chi tiêu (Tiền ra)</option>
+                    <option value="income" className="bg-slate-900">Thu nhập (Tiền vào)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-455 uppercase tracking-wider mb-1">Tên danh mục mới</label>
+                  <input
+                    type="text"
+                    required
+                    value={newCatName}
+                    onChange={(e) => setNewCatName(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg glass-input text-xs font-medium"
+                    placeholder="Ví dụ: Nuôi thú cưng, Sách..."
+                  />
+                </div>
+                <div className="flex items-end">
+                  <button
+                    type="submit"
+                    className="w-full py-2 px-4 rounded-lg bg-purple-650 hover:bg-purple-550 text-white font-semibold transition cursor-pointer text-xs flex items-center justify-center gap-1.5 shadow-md"
+                  >
+                    <Plus className="w-4 h-4" /> Thêm danh mục
+                  </button>
+                </div>
+              </form>
 
               {catMessage && (
                 <div className={`p-3 rounded-xl text-xs font-semibold border ${
@@ -373,19 +366,17 @@ export default function BudgetSettings({
                     {categories.expense.map(cat => (
                       <div key={cat} className="flex justify-between items-center bg-slate-900/30 border border-slate-900/50 p-2.5 rounded-xl hover:border-slate-800 transition duration-150 text-xs">
                         <span className="font-semibold text-slate-200">{cat}</span>
-                        {userRole !== 'user' && (
-                          <button
-                            onClick={() => {
-                              if (confirm(`Bạn có chắc muốn xóa danh mục chi tiêu "${cat}" không?`)) {
-                                onDeleteCategory('expense', cat);
-                              }
-                            }}
-                            className="text-slate-500 hover:text-red-400 p-1 rounded hover:bg-slate-800 transition"
-                            title="Xóa danh mục"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                        <button
+                          onClick={() => {
+                            if (confirm(`Bạn có chắc muốn xóa danh mục chi tiêu "${cat}" không?`)) {
+                              onDeleteCategory('expense', cat);
+                            }
+                          }}
+                          className="text-slate-500 hover:text-red-400 p-1 rounded hover:bg-slate-800 transition"
+                          title="Xóa danh mục"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -398,19 +389,17 @@ export default function BudgetSettings({
                     {categories.income.map(cat => (
                       <div key={cat} className="flex justify-between items-center bg-slate-900/30 border border-slate-900/50 p-2.5 rounded-xl hover:border-slate-800 transition duration-150 text-xs">
                         <span className="font-semibold text-slate-200">{cat}</span>
-                        {userRole !== 'user' && (
-                          <button
-                            onClick={() => {
-                              if (confirm(`Bạn có chắc muốn xóa danh mục thu nhập "${cat}" không?`)) {
-                                onDeleteCategory('income', cat);
-                              }
-                            }}
-                            className="text-slate-500 hover:text-red-400 p-1 rounded hover:bg-slate-850 transition cursor-pointer"
-                            title="Xóa danh mục"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                        <button
+                          onClick={() => {
+                            if (confirm(`Bạn có chắc muốn xóa danh mục thu nhập "${cat}" không?`)) {
+                              onDeleteCategory('income', cat);
+                            }
+                          }}
+                          className="text-slate-500 hover:text-red-400 p-1 rounded hover:bg-slate-850 transition cursor-pointer"
+                          title="Xóa danh mục"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -427,8 +416,7 @@ export default function BudgetSettings({
               </h3>
 
               {/* Form to add schedule */}
-              {userRole !== 'user' && (
-                <form onSubmit={handleRecurringSubmit} className="space-y-4 bg-slate-950 p-5 rounded-2xl border border-slate-900/60">
+              <form onSubmit={handleRecurringSubmit} className="space-y-4 bg-slate-950 p-5 rounded-2xl border border-slate-900/60">
                   <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">Thiết lập lịch chi tiêu/thu tiền mới</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {/* Selector type */}
@@ -545,7 +533,6 @@ export default function BudgetSettings({
                     </button>
                   </div>
                 </form>
-              )}
 
               {/* Show active lists */}
               <div className="space-y-3">
@@ -580,19 +567,17 @@ export default function BudgetSettings({
                           <span className={`font-bold font-heading text-sm ${item.type === 'expense' ? 'text-rose-450' : 'text-emerald-450'}`}>
                             {item.type === 'expense' ? '-' : '+'}{formatVND(item.amount)}
                           </span>
-                          {userRole !== 'user' && (
-                            <button
-                              onClick={() => {
-                                if (confirm(`Bạn có muốn hủy lịch định kỳ "${item.note}" không?`)) {
-                                  onDeleteRecurring(item.id);
-                                }
-                              }}
-                              className="text-slate-500 hover:text-red-400 p-1.5 rounded hover:bg-slate-800 transition"
-                              title="Xóa lịch"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                          <button
+                            onClick={() => {
+                              if (confirm(`Bạn có muốn hủy lịch định kỳ "${item.note}" không?`)) {
+                                onDeleteRecurring(item.id);
+                              }
+                            }}
+                            className="text-slate-500 hover:text-red-400 p-1.5 rounded hover:bg-slate-800 transition"
+                            title="Xóa lịch"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
                     );
@@ -744,18 +729,20 @@ export default function BudgetSettings({
               </form>
 
               {/* Danger Zone */}
-              <div className="border-t border-red-500/15 pt-6 space-y-4">
-                <h4 className="text-xs font-bold text-red-450 uppercase tracking-wider flex items-center gap-1.5">
-                  <AlertTriangle className="w-4 h-4 text-red-500" /> Danger Zone (Vùng nguy hiểm)
-                </h4>
-                <p className="text-[11px] text-slate-500">Các thao tác dưới đây sẽ ảnh hưởng trực tiếp đến dữ liệu và không thể đảo ngược lại.</p>
-                <button
-                  onClick={handleAccountReset}
-                  className="px-5 py-2.5 rounded-xl border border-red-500/20 bg-red-550/5 text-red-450 hover:bg-red-500/10 text-xs font-bold transition cursor-pointer flex items-center gap-2"
-                >
-                  <Trash2 className="w-4 h-4" /> Xóa sạch dữ liệu tài khoản
-                </button>
-              </div>
+              {userRole !== 'user' && (
+                <div className="border-t border-red-500/15 pt-6 space-y-4">
+                  <h4 className="text-xs font-bold text-red-455 uppercase tracking-wider flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-red-500" /> Danger Zone (Vùng nguy hiểm)
+                  </h4>
+                  <p className="text-[11px] text-slate-500">Các thao tác dưới đây sẽ ảnh hưởng trực tiếp đến dữ liệu và không thể đảo ngược lại.</p>
+                  <button
+                    onClick={handleAccountReset}
+                    className="px-5 py-2.5 rounded-xl border border-red-500/20 bg-red-550/5 text-red-450 hover:bg-red-500/10 text-xs font-bold transition cursor-pointer flex items-center gap-2"
+                  >
+                    <Trash2 className="w-4 h-4" /> Xóa sạch dữ liệu tài khoản
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

@@ -117,15 +117,13 @@ export default function Wallets({
           <h2 className="text-2xl font-black text-slate-100 font-heading">Ví & Tài Khoản</h2>
           <p className="text-xs text-slate-400">Quản lý các nguồn tiền hiện có của bạn và tự động cộng tổng tài sản.</p>
         </div>
-        {userRole !== 'user' && (
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-650 hover:from-purple-550 hover:to-indigo-600 text-white font-bold transition flex items-center justify-center gap-2 shadow-lg shadow-purple-500/10 cursor-pointer btn-click-effect border border-purple-500/20 text-xs self-start md:self-auto"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Thêm ví mới</span>
-          </button>
-        )}
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-650 hover:from-purple-550 hover:to-indigo-600 text-white font-bold transition flex items-center justify-center gap-2 shadow-lg shadow-purple-500/10 cursor-pointer btn-click-effect border border-purple-500/20 text-xs self-start md:self-auto"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Thêm ví mới</span>
+        </button>
       </div>
 
       {/* 2. Total Assets Glimmering Card */}
@@ -186,7 +184,6 @@ export default function Wallets({
             </div>
 
             {/* Actions */}
-            {userRole !== 'user' && (
               <div className="flex gap-2 pt-3 border-t border-slate-900/60">
                 <button
                   onClick={() => openEditModal(wallet)}
@@ -210,7 +207,6 @@ export default function Wallets({
                   </button>
                 )}
               </div>
-            )}
           </div>
         ))}
       </div>

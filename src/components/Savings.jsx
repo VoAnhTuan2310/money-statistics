@@ -132,14 +132,12 @@ export default function Savings({ pots, transactions, wallets = [], onAddPot, on
           <h2 className="text-3xl font-bold text-slate-100 font-heading">Quỹ Tiết Kiệm</h2>
           <p className="text-slate-400 mt-1">Quản lý và theo dõi tiến độ hoàn thành các mục tiêu tài chính.</p>
         </div>
-        {userRole !== 'user' && (
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-5 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-medium transition cursor-pointer shadow-lg shadow-purple-500/10 text-sm"
-          >
-            <Plus className="w-4 h-4" /> Tạo Quỹ Mới
-          </button>
-        )}
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="flex items-center gap-2 px-5 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-medium transition cursor-pointer shadow-lg shadow-purple-500/10 text-sm"
+        >
+          <Plus className="w-4 h-4" /> Tạo Quỹ Mới
+        </button>
       </div>
 
       {/* Grid of saving pots */}
@@ -155,19 +153,17 @@ export default function Savings({ pots, transactions, wallets = [], onAddPot, on
                   <div className={`px-3 py-1 rounded-full text-xs font-semibold ${colorData.bg} ${colorData.text} border ${colorData.border}`}>
                     {percent}% Hoàn thành
                   </div>
-                  {userRole !== 'user' && (
-                    <button
-                      onClick={() => {
-                        if (confirm(`Bạn có chắc chắn muốn xóa quỹ "${pot.name}" không?`)) {
-                          onDeletePot(pot.id);
-                        }
-                      }}
-                      className="text-slate-500 hover:text-red-400 p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
-                      title="Xóa quỹ"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
+                  <button
+                    onClick={() => {
+                      if (confirm(`Bạn có chắc chắn muốn xóa quỹ "${pot.name}" không?`)) {
+                        onDeletePot(pot.id);
+                      }
+                    }}
+                    className="text-slate-500 hover:text-red-400 p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
+                    title="Xóa quỹ"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
 
                 <h3 className="text-xl font-bold text-slate-100 mt-4 line-clamp-1">{pot.name}</h3>
@@ -190,22 +186,20 @@ export default function Savings({ pots, transactions, wallets = [], onAddPot, on
                 )}
               </div>
 
-              {userRole !== 'user' && (
-                <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-slate-900">
-                  <button
-                    onClick={() => openTransfer(pot, 'deposit')}
-                    className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-semibold border border-emerald-500/20 transition cursor-pointer"
-                  >
-                    <ArrowUpRight className="w-3.5 h-3.5" /> Gửi thêm
-                  </button>
-                  <button
-                    onClick={() => openTransfer(pot, 'withdraw')}
-                    className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold border border-rose-500/20 transition cursor-pointer"
-                  >
-                    <ArrowDownLeft className="w-3.5 h-3.5" /> Rút tiền
-                  </button>
-                </div>
-              )}
+              <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-slate-900">
+                <button
+                  onClick={() => openTransfer(pot, 'deposit')}
+                  className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-semibold border border-emerald-500/20 transition cursor-pointer"
+                >
+                  <ArrowUpRight className="w-3.5 h-3.5" /> Gửi thêm
+                </button>
+                <button
+                  onClick={() => openTransfer(pot, 'withdraw')}
+                  className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold border border-rose-500/20 transition cursor-pointer"
+                >
+                  <ArrowDownLeft className="w-3.5 h-3.5" /> Rút tiền
+                </button>
+              </div>
             </div>
           );
         })}

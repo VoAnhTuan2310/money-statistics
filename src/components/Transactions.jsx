@@ -251,8 +251,7 @@ export default function Transactions({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* LEFT COLUMN: Input Form */}
-      {userRole !== 'user' && (
-        <div className="lg:col-span-1 space-y-6">
+      <div className="lg:col-span-1 space-y-6">
         <div className="glass-panel p-6 rounded-2xl shadow-xl sticky top-6">
           <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2 mb-4 border-b border-slate-800 pb-3 font-heading">
             {editingId ? <Edit3 className="w-5 h-5 text-indigo-400" /> : <Plus className="w-5 h-5 text-purple-400" />}
@@ -545,10 +544,9 @@ export default function Transactions({
           )}
         </div>
       </div>
-    )}
 
       {/* RIGHT COLUMN: Transaction History and Filters */}
-      <div className={userRole === 'user' ? "lg:col-span-3 space-y-6" : "lg:col-span-2 space-y-6"}>
+      <div className="lg:col-span-2 space-y-6">
         
         {/* Filters and search panel */}
         <div className="glass-panel p-6 rounded-2xl shadow-xl space-y-4">
@@ -755,7 +753,7 @@ export default function Transactions({
                     <th className="py-3 px-4">Ngày</th>
                     <th className="py-3 px-4">Danh mục / Ghi chú</th>
                     <th className="py-3 px-4 text-right">Số tiền</th>
-                    {userRole !== 'user' && <th className="py-3 px-4 text-center">Thao tác</th>}
+                    <th className="py-3 px-4 text-center">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-900/50 text-xs">
@@ -780,30 +778,28 @@ export default function Transactions({
                       <td className="py-3 px-4 text-right whitespace-nowrap font-bold text-rose-450 font-heading">
                         -{formatVND(tx.amount)}
                       </td>
-                      {userRole !== 'user' && (
-                        <td className="py-3 px-4 text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <button
-                              onClick={() => startEdit(tx)}
-                              className="p-1 rounded text-slate-400 hover:text-indigo-400 hover:bg-slate-800 transition cursor-pointer"
-                              title="Sửa"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => {
-                                if (confirm('Bạn có chắc chắn muốn xóa giao dịch này?')) {
-                                  onDeleteTransaction(tx.id);
-                                }
-                              }}
-                              className="p-1 rounded text-slate-400 hover:text-red-405 hover:bg-slate-800 transition cursor-pointer"
-                              title="Xóa"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      )}
+                      <td className="py-3 px-4 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => startEdit(tx)}
+                            className="p-1 rounded text-slate-400 hover:text-indigo-400 hover:bg-slate-800 transition cursor-pointer"
+                            title="Sửa"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (confirm('Bạn có chắc chắn muốn xóa giao dịch này?')) {
+                                onDeleteTransaction(tx.id);
+                              }
+                            }}
+                            className="p-1 rounded text-slate-400 hover:text-red-405 hover:bg-slate-800 transition cursor-pointer"
+                            title="Xóa"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                   {expenses.length === 0 && (
@@ -846,28 +842,26 @@ export default function Transactions({
                     <span className="font-bold font-heading text-sm text-rose-455">
                       -{formatVND(tx.amount)}
                     </span>
-                    {userRole !== 'user' && (
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => startEdit(tx)}
-                          className="p-1 rounded bg-slate-900/60 border border-slate-850 text-slate-405 hover:text-indigo-400 hover:bg-slate-800 transition cursor-pointer"
-                          title="Sửa"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (confirm('Bạn có chắc chắn muốn xóa giao dịch này?')) {
-                              onDeleteTransaction(tx.id);
-                            }
-                          }}
-                          className="p-1 rounded bg-slate-900/60 border border-slate-850 text-slate-405 hover:text-red-405 hover:bg-slate-800 transition cursor-pointer"
-                          title="Xóa"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => startEdit(tx)}
+                        className="p-1 rounded bg-slate-900/60 border border-slate-850 text-slate-405 hover:text-indigo-400 hover:bg-slate-800 transition cursor-pointer"
+                        title="Sửa"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm('Bạn có chắc chắn muốn xóa giao dịch này?')) {
+                            onDeleteTransaction(tx.id);
+                          }
+                        }}
+                        className="p-1 rounded bg-slate-900/60 border border-slate-850 text-slate-405 hover:text-red-405 hover:bg-slate-800 transition cursor-pointer"
+                        title="Xóa"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -896,7 +890,7 @@ export default function Transactions({
                     <th className="py-3 px-4">Ngày</th>
                     <th className="py-3 px-4">Danh mục / Ghi chú</th>
                     <th className="py-3 px-4 text-right">Số tiền</th>
-                    {userRole !== 'user' && <th className="py-3 px-4 text-center">Thao tác</th>}
+                    <th className="py-3 px-4 text-center">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-900/50 text-xs">
@@ -921,30 +915,28 @@ export default function Transactions({
                       <td className="py-3 px-4 text-right whitespace-nowrap font-bold text-emerald-450 font-heading">
                         +{formatVND(tx.amount)}
                       </td>
-                      {userRole !== 'user' && (
-                        <td className="py-3 px-4 text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <button
-                              onClick={() => startEdit(tx)}
-                              className="p-1 rounded text-slate-400 hover:text-indigo-455 hover:bg-slate-800 transition cursor-pointer"
-                              title="Sửa"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => {
-                                if (confirm('Bạn có chắc chắn muốn xóa giao dịch này?')) {
-                                  onDeleteTransaction(tx.id);
-                                }
-                              }}
-                              className="p-1 rounded text-slate-400 hover:text-red-405 hover:bg-slate-800 transition cursor-pointer"
-                              title="Xóa"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      )}
+                      <td className="py-3 px-4 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => startEdit(tx)}
+                            className="p-1 rounded text-slate-400 hover:text-indigo-455 hover:bg-slate-800 transition cursor-pointer"
+                            title="Sửa"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (confirm('Bạn có chắc chắn muốn xóa giao dịch này?')) {
+                                onDeleteTransaction(tx.id);
+                              }
+                            }}
+                            className="p-1 rounded text-slate-400 hover:text-red-405 hover:bg-slate-800 transition cursor-pointer"
+                            title="Xóa"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                   {incomes.length === 0 && (
@@ -987,28 +979,26 @@ export default function Transactions({
                     <span className="font-bold font-heading text-sm text-emerald-455">
                       +{formatVND(tx.amount)}
                     </span>
-                    {userRole !== 'user' && (
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => startEdit(tx)}
-                          className="p-1 rounded bg-slate-900/60 border border-slate-850 text-slate-455 hover:text-indigo-400 hover:bg-slate-800 transition cursor-pointer"
-                          title="Sửa"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (confirm('Bạn có chắc chắn muốn xóa giao dịch này?')) {
-                              onDeleteTransaction(tx.id);
-                            }
-                          }}
-                          className="p-1 rounded bg-slate-900/60 border border-slate-850 text-slate-455 hover:text-red-405 hover:bg-slate-800 transition cursor-pointer"
-                          title="Xóa"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => startEdit(tx)}
+                        className="p-1 rounded bg-slate-900/60 border border-slate-850 text-slate-455 hover:text-indigo-400 hover:bg-slate-800 transition cursor-pointer"
+                        title="Sửa"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm('Bạn có chắc chắn muốn xóa giao dịch này?')) {
+                            onDeleteTransaction(tx.id);
+                          }
+                        }}
+                        className="p-1 rounded bg-slate-900/60 border border-slate-850 text-slate-455 hover:text-red-405 hover:bg-slate-800 transition cursor-pointer"
+                        title="Xóa"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
