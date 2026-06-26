@@ -294,3 +294,152 @@ LƯU Ý: CHỈ TRẢ VỀ JSON HỢP LỆ, KHÔNG CHỨA BẤT KỲ CHỮ NÀO K
     return parseTransactionLocally(text, wallets, categories);
   }
 }
+
+export function parseDescriptionAddressLocally(addressText) {
+  const raw = addressText.trim();
+  
+  // Define keywords/prefixes for relative descriptions in lowercase
+  const relativeKeywords = [
+    'đối diện cổng', 'đối diện', 'kế bên', 'bên cạnh', 'cạnh', 
+    'sát bên', 'sát', 'gần cổng', 'gần', 'phía trước', 'phía sau', 
+    'đằng trước', 'đằng sau', 'trước cửa', 'trước', 'sau'
+  ];
+  
+  // 1. Try to find relative text inside parentheses first, e.g. "120 Hoàng Diệu (đối diện quán cafe)"
+  const parenRegex = /\(([^)]+)\)/;
+  const parenMatch = raw.match(parenRegex);
+  if (parenMatch) {
+    const insideText = parenMatch[1].trim();
+    const lowerInside = insideText.toLowerCase();
+    if (relativeKeywords.some(kw => lowerInside.includes(kw))) {
+      const cleanTarget = raw.replace(parenMatch[0], '').replace(/\s*,\s*$/, '').replace(/^\s*,\s*/, '').trim();
+      return {
+        routeTarget: cleanTarget.replace(/\s+/g, ' '),
+        clue: insideText,
+        explanation: `Hãy đi đến địa điểm: "${cleanTarget}" rồi tìm xung quanh theo mốc: "${insideText}"`
+      };
+    }
+  }
+
+  // 2. Try to split by common separators like comma or semicolon and check parts
+  // E.g., "120/15 CMT8, đối diện quán cafe Highlands"
+  const parts = raw.split(/[,;]\s*/);
+  if (parts.length > 1) {
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i].trim();
+      const lowerPart = part.toLowerCase();
+      const matchedKeyword = relativeKeywords.find(kw => lowerPart.startsWith(kw));
+      if (matchedKeyword) {
+        const otherParts = parts.filter((_, idx) => idx !== i);
+        const cleanTarget = otherParts.join(', ').trim();
+        return {
+          routeTarget: cleanTarget,
+          clue: part,
+          explanation: `Hãy đi đến địa điểm: "${cleanTarget}" rồi tìm xung quanh theo mốc: "${part}"`
+        };
+      }
+    }
+  }
+
+  // 3. Regex for prefix matching if not split by commas, e.g. "đối diện cafe Highlands hẻm 120 Hoàng Diệu"
+  const relationPattern = new RegExp(`^(${relativeKeywords.join('|')})\\s+(?:quán\\s+|tiệm\\s+|nhà\\s+|trường\\s+|cổng\\s+|cửa\\s+hàng\\s+|cafe\\s+|cà\\s+phê\\s+)?([a-zA-Z0-9\\sÀ-ỹ]+?)(?:\\s+(?:hẻm|ngõ|kiệt|số|đường|quận|huyện|phường|tp|tphcm).*)$`, 'i');
+  const prefixMatch = raw.match(relationPattern);
+  if (prefixMatch) {
+    const relation = prefixMatch[1];
+    const targetObj = prefixMatch[2];
+    const rest = raw.substring(prefixMatch[0].length - (raw.match(/(?:hẻm|ngõ|kiệt|số|đường|quận|huyện|phường|tp|tphcm).*$/i)?.[0]?.length || 0));
+    return {
+      routeTarget: rest.trim(),
+      clue: `${relation} ${targetObj.trim()}`,
+      explanation: `Hãy đi đến địa điểm: "${rest.trim()}" rồi tìm xung quanh theo mốc: "${relation} ${targetObj.trim()}"`
+    };
+  }
+
+  // 4. Regex for suffix matching if not split by commas, e.g. "hẻm 120 Hoàng Diệu đối diện cafe Highlands"
+  const suffixRelationPattern = new RegExp(`^(.*?)\\s+(${relativeKeywords.join('|')})\\s+(.+)$`, 'i');
+  const suffixMatch = raw.match(suffixRelationPattern);
+  if (suffixMatch) {
+    const rest = suffixMatch[1];
+    const relation = suffixMatch[2];
+    const targetObj = suffixMatch[3];
+    return {
+      routeTarget: rest.trim(),
+      clue: `${relation} ${targetObj.trim()}`,
+      explanation: `Hãy đi đến địa điểm: "${rest.trim()}" rồi tìm xung quanh theo mốc: "${relation} ${targetObj.trim()}"`
+    };
+  }
+
+  // Default: no relative info found
+  return {
+    routeTarget: raw,
+    clue: null,
+    explanation: null
+  };
+}
+
+export async function parseDescriptionAddressWithAI(addressText, geminiKey) {
+  if (!geminiKey) {
+    return parseDescriptionAddressLocally(addressText);
+  }
+
+  const systemPrompt = `
+Bạn là trợ lý đắc lực cho tài xế giao hàng ở Việt Nam. Bạn có nhiệm vụ giải mã các địa chỉ không cụ thể hoặc chứa các chỉ dẫn/mốc định vị tương đối để chuyển nó thành địa chỉ/tên địa điểm sạch có khả năng tìm kiếm tốt nhất trên Google Maps.
+
+Hãy phân tích chuỗi địa chỉ đầu vào sau:
+- Nếu địa chỉ có dạng: "đối diện quán cafe X, hẻm 123 đường Y" -> địa chỉ để Google Maps tìm kiếm tốt nhất là "hẻm 123 đường Y, Phường, Quận, Thành phố". Còn chỉ dẫn "đối diện quán cafe X" là mốc định vị thực tế bằng mắt.
+- Nếu địa chỉ có dạng: "bên cạnh nhà số 150 Cách Mạng Tháng Tám" -> địa chỉ Google Maps tốt nhất là "150 Cách Mạng Tháng Tám". Mốc thực tế là "bên cạnh nhà số 150".
+- Nếu địa chỉ có dạng: "Highlands Coffee Hoàng Diệu, đối diện trường học" -> địa chỉ Google Maps tốt nhất là "Highlands Coffee Hoàng Diệu". Mốc thực tế là "đối diện trường học".
+
+Hãy trả về một đối tượng JSON duy nhất có cấu trúc sau:
+{
+  "routeTarget": "Địa chỉ sạch hoặc tên địa điểm sạch tốt nhất dùng để dẫn đường trên Google Maps",
+  "clue": "Mốc định vị thực tế (ví dụ: 'Đối diện quán cafe X', 'Kế bên nhà số 150') hoặc null nếu không có",
+  "explanation": "Lời khuyên ngắn gọn để tìm nhà (ví dụ: 'Hãy tìm nhà sát bên số 150', 'Đi đến hẻm 123 rồi nhìn sang đối diện thấy quán X')"
+}
+
+LƯU Ý: CHỈ TRẢ VỀ JSON HỢP LỆ, KHÔNG CHỨA BẤT KỲ CHỮ NÀO KHÁC NGOÀI JSON. KHÔNG BỌC TRONG BLOCK CODE \`\`\`json.
+`;
+
+  try {
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: `Phân tích mô tả địa chỉ này: "${addressText}"` }]
+          }
+        ],
+        systemInstruction: {
+          parts: [{ text: systemPrompt }]
+        }
+      })
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error?.message || 'Gemini API Error');
+    }
+
+    let replyText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const firstBrace = replyText.indexOf('{');
+    const lastBrace = replyText.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1) {
+      replyText = replyText.substring(firstBrace, lastBrace + 1);
+    }
+    
+    const parsed = JSON.parse(replyText);
+    return {
+      routeTarget: parsed.routeTarget || addressText,
+      clue: parsed.clue || null,
+      explanation: parsed.explanation || null
+    };
+  } catch (err) {
+    console.error('Gemini Address parsing error, falling back locally:', err);
+    return parseDescriptionAddressLocally(addressText);
+  }
+}

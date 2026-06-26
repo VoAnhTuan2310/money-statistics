@@ -1,64 +1,137 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
-  Bike, Calendar, Trash2, Plus, CheckCircle, Fuel, Phone, Coffee, 
-  BarChart3, TrendingUp, ClipboardList, ChevronRight, Gauge,
-  MapPin, Compass, Navigation, Search, X
+  Bike, Calendar, Trash2, CheckCircle, Fuel, Phone, Coffee, 
+  BarChart3, TrendingUp, ClipboardList, Gauge,
+  MapPin, Compass, Navigation, Search, X, RefreshCw, Sparkles
 } from 'lucide-react';
 import { 
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, 
   CartesianGrid, Tooltip, Legend 
 } from 'recharts';
 import { formatVND } from '../utils/storage';
+import { parseDescriptionAddressWithAI } from '../utils/aiParser';
 
-export default function ShopeeFoodDriver({ activeUser }) {
+export default function ShopeeFoodDriver({ activeUser, geminiKey }) {
   // ------------------ ALLEY HELPER STATE & LOGIC ------------------
   const [addressInput, setAddressInput] = useState('');
   const [parsedAddress, setParsedAddress] = useState(null);
+  const [lastParsedAddressText, setLastParsedAddressText] = useState('');
+  const [isParsingAddress, setIsParsingAddress] = useState(false);
 
-  const handleParseAddress = (addr) => {
+  const handleParseAddress = useCallback(async (addr) => {
     if (!addr.trim()) {
       setParsedAddress(null);
+      setLastParsedAddressText('');
       return;
     }
+
+    if (addr.trim() === lastParsedAddressText) {
+      return; // Prevent duplicate work
+    }
     
-    // Clean address prefixes
-    let target = addr.trim().replace(/^(số|địa chỉ:?)\s+/i, '');
-    
-    // Regex matches e.g. "248/45/12/5" and the rest
-    const match = target.match(/^(\d+[a-zA-Z]?\/[0-9a-zA-Z\/]*)\s+(.+)$/);
-    
-    if (match) {
-      const slashes = match[1];
-      const streetInfo = match[2];
-      const parts = slashes.split('/');
+    setIsParsingAddress(true);
+    try {
+      // 1. Parse address description with AI (or local regex) to clean up descriptive terms
+      const aiResult = await parseDescriptionAddressWithAI(addr, geminiKey);
+      const cleanAddress = aiResult.routeTarget;
+      const clue = aiResult.clue;
+      const explanation = aiResult.explanation;
+
+      // Clean up target:
+      // Strip common prefixes: "địa chỉ", "số", "hẻm số", "ngõ số", "kiệt số", "hẻm", "ngõ", "kiệt"
+      let target = cleanAddress.trim()
+        .replace(/^(địa chỉ|số|hẻm số|ngõ số|kiệt số|hẻm|ngõ|kiệt):?\s+/i, '');
       
-      const mainEntrance = `${parts[0]} ${streetInfo}`;
-      const firstLevelAlley = parts.length > 1 ? `${parts[0]}/${parts[1]} ${streetInfo}` : mainEntrance;
+      // Clean up spaces around slashes: e.g. "248 / 45 / 12" -> "248/45/12"
+      target = target.replace(/\s*\/\s*/g, '/');
+
+      // 2. Extract slash parts from the cleaned address
+      // Regex matches: e.g. "248/45/12 Hoàng Văn Thụ" -> group 1: "248/45/12", group 2: "Hoàng Văn Thụ"
+      const match = target.match(/^(\d+[a-zA-Z]?\/[0-9a-zA-Z/]*)\s+(.+)$/);
       
-      const instructions = parts.map((part, index) => {
-        if (index === 0) return `Đi đến đầu hẻm chính tại số: ${part}`;
-        if (index === parts.length - 1) return `Tìm tiếp đến số nhà: ${part}`;
-        return `Rẽ tiếp vào ngách/hẻm phụ: ${part}`;
-      });
-      
-      setParsedAddress({
-        isAlley: true,
-        originalSlashes: slashes,
-        parts,
-        streetInfo,
-        mainEntrance,
-        firstLevelAlley,
-        instructions
-      });
-    } else {
+      if (match) {
+        const slashes = match[1];
+        const streetInfo = match[2];
+        const parts = slashes.split('/');
+        
+        const mainEntrance = `${parts[0]} ${streetInfo}`;
+        const firstLevelAlley = parts.length > 1 ? `${parts[0]}/${parts[1]} ${streetInfo}` : mainEntrance;
+        
+        const instructions = parts.map((part, index) => {
+          if (index === 0) return `Đi đến đầu hẻm chính tại số: ${part}`;
+          if (index === parts.length - 1) return `Tìm tiếp đến số nhà: ${part}`;
+          return `Rẽ tiếp vào ngách/hẻm phụ: ${part}`;
+        });
+        
+        setParsedAddress({
+          isAlley: true,
+          originalSlashes: slashes,
+          parts,
+          streetInfo,
+          mainEntrance,
+          firstLevelAlley,
+          instructions,
+          clue,
+          explanation
+        });
+      } else {
+        // Try to parse number and street for non-alley addresses
+        const nonAlleyMatch = target.match(/^(\d+[a-zA-Z]?)\s+(.+)$/);
+        let instructions = [];
+        if (nonAlleyMatch) {
+          instructions = [
+            `Di chuyển vào đường: ${nonAlleyMatch[2]}`,
+            `Tìm số nhà: ${nonAlleyMatch[1]} trên mặt đường chính`
+          ];
+        } else {
+          instructions = [
+            `Di chuyển đến địa điểm: ${target}`,
+            `Quan sát bảng hiệu và lối vào khi đến gần`
+          ];
+        }
+        if (clue) {
+          instructions.push(`Quan sát mốc định vị thực tế: ${clue}`);
+        }
+
+        setParsedAddress({
+          isAlley: false,
+          mainEntrance: target,
+          firstLevelAlley: target,
+          instructions,
+          clue,
+          explanation
+        });
+      }
+      setLastParsedAddressText(addr.trim());
+    } catch (err) {
+      console.error(err);
+      // Local fallback
+      let target = addr.trim().replace(/^(số|địa chỉ:?)\s+/i, '');
       setParsedAddress({
         isAlley: false,
         mainEntrance: target,
         firstLevelAlley: target,
-        instructions: ["Địa chỉ không có hẻm nhiều xuyệt. Đi thẳng đến số nhà trên bản đồ."]
+        instructions: ["Đi thẳng đến địa chỉ trên bản đồ."],
+        clue: null,
+        explanation: null
       });
+    } finally {
+      setIsParsingAddress(false);
     }
-  };
+  }, [geminiKey, lastParsedAddressText]);
+
+  // Debounce address parsing to avoid network/API spam on every keystroke
+  useEffect(() => {
+    if (!addressInput.trim()) {
+      return;
+    }
+
+    const delayDebounceFn = setTimeout(() => {
+      handleParseAddress(addressInput);
+    }, 600);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [addressInput, handleParseAddress]);
 
   // ------------------ SHIFT STATE ------------------
   const [shifts, setShifts] = useState(() => {
@@ -196,38 +269,62 @@ export default function ShopeeFoodDriver({ activeUser }) {
           <Compass className="w-5 h-5 text-purple-400 transition-transform hover:rotate-180 duration-500" />
           <div>
             <h3 className="text-sm font-bold text-slate-200">Trình Tìm Đường & Giải Mã Địa Chỉ Hẻm Sâu 🧭</h3>
-            <p className="text-[10px] text-slate-500 mt-0.5">Dán địa chỉ ShopeeFood có nhiều xuyệt (/) để tự động phân tích lối vào hẻm lớn tránh lỗi đi vòng của Google Maps.</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">Dán địa chỉ ShopeeFood (kể cả hẻm nhiều xuyệt hoặc kèm mốc định vị) để tự động làm sạch và lên sơ đồ di chuyển thông minh.</p>
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-              <MapPin className="w-4 h-4 text-purple-400" />
+              {isParsingAddress ? (
+                <RefreshCw className="w-4 h-4 text-purple-400 animate-spin" />
+              ) : (
+                <MapPin className="w-4 h-4 text-purple-400" />
+              )}
             </span>
             <input
               type="text"
               placeholder="Dán địa chỉ từ app, ví dụ: 248/45/12/5 Hoàng Văn Thụ, Phường 4, Tân Bình"
               value={addressInput}
               onChange={(e) => {
-                setAddressInput(e.target.value);
-                handleParseAddress(e.target.value);
+                const val = e.target.value;
+                setAddressInput(val);
+                if (!val.trim()) {
+                  setParsedAddress(null);
+                  setLastParsedAddressText('');
+                }
               }}
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl glass-input text-xs"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleParseAddress(addressInput);
+                }
+              }}
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl glass-input text-xs font-semibold text-slate-200"
             />
           </div>
-          {addressInput && (
+          <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => {
-                setAddressInput('');
-                setParsedAddress(null);
-              }}
-              className="px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white text-xs font-semibold cursor-pointer transition flex items-center justify-center gap-1.5"
+              onClick={() => handleParseAddress(addressInput)}
+              disabled={isParsingAddress || !addressInput.trim()}
+              className="px-4 py-2.5 rounded-xl bg-purple-650 hover:bg-purple-600 disabled:bg-purple-800/40 disabled:text-slate-550 text-white text-xs font-extrabold cursor-pointer transition flex items-center justify-center gap-1.5 shadow-md shadow-purple-500/10 border border-purple-500/20"
             >
-              <X className="w-4 h-4" /> Xóa
+              <Search className="w-4 h-4" /> Phân tích
             </button>
-          )}
+            {addressInput && (
+              <button
+                type="button"
+                onClick={() => {
+                  setAddressInput('');
+                  setParsedAddress(null);
+                  setLastParsedAddressText('');
+                }}
+                className="px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white text-xs font-semibold cursor-pointer transition flex items-center justify-center gap-1.5"
+              >
+                <X className="w-4 h-4" /> Xóa
+              </button>
+            )}
+          </div>
         </div>
 
         {parsedAddress && (
@@ -235,8 +332,9 @@ export default function ShopeeFoodDriver({ activeUser }) {
             {/* Left side: instructions and links (span 3) */}
             <div className="lg:col-span-3 space-y-4">
               <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-900/60 space-y-3">
-                <h4 className="text-[10px] font-bold text-purple-400 uppercase tracking-widest border-b border-slate-900 pb-1.5 font-heading">
-                  Sơ đồ chỉ lối đi trong hẻm
+                <h4 className="text-[10px] font-bold text-purple-400 uppercase tracking-widest border-b border-slate-900 pb-1.5 font-heading flex items-center gap-1.5">
+                  <Compass className="w-3.5 h-3.5" />
+                  <span>{parsedAddress.isAlley ? 'Sơ đồ chỉ lối đi trong hẻm' : 'Hướng dẫn di chuyển & tìm điểm đến'}</span>
                 </h4>
                 <div className="space-y-2.5">
                   {parsedAddress.instructions.map((step, idx) => (
@@ -252,34 +350,64 @@ export default function ShopeeFoodDriver({ activeUser }) {
                 </div>
               </div>
 
+              {parsedAddress.clue && (
+                <div className="bg-amber-500/5 p-4 rounded-2xl border border-amber-500/15 space-y-1 animate-slide-up">
+                  <h5 className="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5 animate-pulse" /> Gợi ý tìm nhà bằng mắt (AI)
+                  </h5>
+                  <p className="text-xs text-amber-200 font-extrabold">
+                    {parsedAddress.clue}
+                  </p>
+                  {parsedAddress.explanation && (
+                    <p className="text-[10px] text-slate-400 leading-relaxed pt-0.5">
+                      {parsedAddress.explanation}
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Action Buttons */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(parsedAddress.firstLevelAlley)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="py-2.5 rounded-xl bg-purple-650 hover:bg-purple-600 text-white font-bold transition text-center text-xs flex items-center justify-center gap-1.5 shadow-md shadow-purple-500/10 border border-purple-500/20"
-                >
-                  <Navigation className="w-4 h-4" />
-                  <span>Dẫn đến ngách chính (Khuyên dùng)</span>
-                </a>
-                <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(parsedAddress.mainEntrance)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="py-2.5 rounded-xl bg-slate-900 hover:bg-slate-850 text-slate-200 border border-slate-800 font-bold transition text-center text-xs flex items-center justify-center gap-1.5"
-                >
-                  <MapPin className="w-4 h-4 text-purple-400" />
-                  <span>Dẫn đến đầu hẻm chính</span>
-                </a>
-                <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressInput)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="py-2.5 rounded-xl bg-slate-900 hover:bg-slate-850 text-slate-350 border border-slate-850 transition text-center text-xs flex items-center justify-center gap-1.5 sm:col-span-2"
-                >
-                  <span>Dẫn đến địa chỉ đầy đủ (Nhập nguyên bản)</span>
-                </a>
+                {parsedAddress.isAlley ? (
+                  <>
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(parsedAddress.firstLevelAlley)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="py-2.5 rounded-xl bg-purple-650 hover:bg-purple-600 text-white font-bold transition text-center text-xs flex items-center justify-center gap-1.5 shadow-md shadow-purple-500/10 border border-purple-500/20"
+                    >
+                      <Navigation className="w-4 h-4" />
+                      <span>Dẫn đến ngách chính (Khuyên dùng)</span>
+                    </a>
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(parsedAddress.mainEntrance)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="py-2.5 rounded-xl bg-slate-900 hover:bg-slate-850 text-slate-200 border border-slate-800 font-bold transition text-center text-xs flex items-center justify-center gap-1.5"
+                    >
+                      <MapPin className="w-4 h-4 text-purple-400" />
+                      <span>Dẫn đến đầu hẻm chính</span>
+                    </a>
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressInput)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="py-2.5 rounded-xl bg-slate-900 hover:bg-slate-850 text-slate-350 border border-slate-850 transition text-center text-xs flex items-center justify-center gap-1.5 sm:col-span-2"
+                    >
+                      <span>Dẫn đến địa chỉ đầy đủ (Nhập nguyên bản)</span>
+                    </a>
+                  </>
+                ) : (
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressInput)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="py-2.5 rounded-xl bg-purple-650 hover:bg-purple-600 text-white font-bold transition text-center text-xs flex items-center justify-center gap-1.5 shadow-md shadow-purple-500/10 border border-purple-500/20 sm:col-span-2"
+                  >
+                    <Navigation className="w-4 h-4" />
+                    <span>Dẫn đường Google Maps (1-Chạm)</span>
+                  </a>
+                )}
                 <a
                   href={`https://map.coccoc.com/map?query=${encodeURIComponent(addressInput)}`}
                   target="_blank"

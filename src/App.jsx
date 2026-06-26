@@ -560,6 +560,7 @@ export default function App() {
         return (
           <ShopeeFoodDriver 
             activeUser={activeUser}
+            geminiKey={geminiKey}
           />
         );
       case 'accounts':
