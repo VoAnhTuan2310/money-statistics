@@ -1,7 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   ChevronLeft, ChevronRight, Plus, Trash2, Edit3, X, Check,
-  ArrowUpRight, ArrowDownLeft, Calendar as CalendarIcon, Tag, Wallet, RefreshCw, Sparkles
+  ArrowUpRight, ArrowDownLeft, Calendar as CalendarIcon, Tag, Wallet, RefreshCw, Sparkles,
+  Mic, MicOff
 } from 'lucide-react';
 import { formatVND, formatNumberInput, getCategories } from '../utils/storage';
 import { parseTransactionWithAI, getLocalDateString } from '../utils/aiParser';
@@ -41,6 +42,55 @@ export default function DailyTransactions({
   const [aiInput, setAiInput] = useState('');
   const [isParsing, setIsParsing] = useState(false);
   const [parsedResult, setParsedResult] = useState(null);
+
+  // Voice Input State
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
+
+  const toggleListening = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Trình duyệt của bạn không hỗ trợ nhận diện giọng nói. Vui lòng dùng Google Chrome, Edge hoặc Safari!");
+      return;
+    }
+
+    if (isListening) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'vi-VN';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onerror = (event) => {
+      console.error(event.error);
+      setIsListening(false);
+      if (event.error === 'not-allowed') {
+        alert("Bạn chưa cấp quyền truy cập Microphone cho trang web. Vui lòng kiểm tra cài đặt trình duyệt!");
+      }
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setAiInput(prev => prev ? `${prev} ${transcript}` : transcript);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
 
   const handleAiParse = async () => {
     if (!aiInput.trim() || isParsing) return;
@@ -478,14 +528,36 @@ export default function DailyTransactions({
               {inputMode === 'ai' && !editingTx ? (
                 <div className="space-y-4 animate-slide-up">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Mô tả giao dịch tự nhiên</label>
-                    <textarea
-                      rows={3}
-                      value={aiInput}
-                      onChange={(e) => setAiInput(e.target.value)}
-                      placeholder="Ví dụ: chạy shopeefood nhận được 100k tiền mặt được khách bo 5k"
-                      className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium resize-none scrollbar-none"
-                    />
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Mô tả giao dịch tự nhiên</label>
+                      {isListening && (
+                        <span className="text-[10px] text-rose-455 font-bold animate-pulse flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping"></span>
+                          Đang nghe...
+                        </span>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <textarea
+                        rows={3}
+                        value={aiInput}
+                        onChange={(e) => setAiInput(e.target.value)}
+                        placeholder="Ví dụ: chạy shopeefood nhận được 100k tiền mặt được khách bo 5k"
+                        className="w-full px-3.5 py-2.5 pr-12 rounded-xl glass-input text-xs font-medium resize-none scrollbar-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={toggleListening}
+                        className={`absolute right-3 bottom-3 p-2 rounded-xl transition duration-200 cursor-pointer flex items-center justify-center ${
+                          isListening
+                            ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30 shadow-[0_0_12px_rgba(244,63,94,0.35)] animate-pulse'
+                            : 'bg-slate-900/60 hover:bg-slate-800 text-purple-400 border border-slate-850 hover:text-purple-300'
+                        }`}
+                        title={isListening ? "Dừng ghi âm" : "Ghi âm giọng nói 🎙️"}
+                      >
+                        {isListening ? <MicOff className="w-4 h-4 text-rose-400" /> : <Mic className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
 
                   <button

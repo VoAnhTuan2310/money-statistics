@@ -18,7 +18,9 @@ import {
   LogOut,
   Sparkles,
   Calendar,
-  Calculator
+  Calculator,
+  Timer,
+  Bike
 } from 'lucide-react';
 import { 
   getTransactions, 
@@ -64,6 +66,8 @@ import Login from './components/Login';
 import DailyTransactions from './components/DailyTransactions';
 import AccountManager from './components/AccountManager';
 import FinancialCalculator from './components/FinancialCalculator';
+import WorkTimer from './components/WorkTimer';
+import ShopeeFoodDriver from './components/ShopeeFoodDriver';
 
 export default function App() {
   const [transactions, setTransactions] = useState([]);
@@ -81,7 +85,18 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [userRole, setUserRole] = useState('user');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeTheme, setActiveTheme] = useState(() => localStorage.getItem('fintrack_theme') || 'purple');
   const [stars, setStars] = useState([]);
+
+  // Apply active theme class to document element
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.remove('theme-green', 'theme-rose', 'theme-blue', 'theme-amber');
+    if (activeTheme !== 'purple') {
+      root.classList.add(`theme-${activeTheme}`);
+    }
+    localStorage.setItem('fintrack_theme', activeTheme);
+  }, [activeTheme]);
 
   // Load state on mount
   useEffect(() => {
@@ -231,18 +246,21 @@ export default function App() {
     addTransaction(tx);
     
     // Update associated wallet balance
-    const walletId = tx.walletId || (wallets.length > 0 ? wallets[0].id : null);
-    if (walletId) {
-      const updatedWallets = wallets.map(w => {
-        if (w.id === walletId) {
+    const walletId = tx.walletId;
+    setWallets(prevWallets => {
+      const activeWalletId = walletId || (prevWallets.length > 0 ? prevWallets[0].id : null);
+      if (!activeWalletId) return prevWallets;
+      
+      const updated = prevWallets.map(w => {
+        if (w.id === activeWalletId) {
           const change = tx.type === 'income' ? tx.amount : -tx.amount;
           return { ...w, balance: w.balance + change };
         }
         return w;
       });
-      setWallets(updatedWallets);
-      saveWallets(updatedWallets);
-    }
+      saveWallets(updated);
+      return updated;
+    });
     
     setTransactions(getTransactions());
   };
@@ -251,19 +269,22 @@ export default function App() {
     // Find transaction to know its details before deleting
     const tx = transactions.find(t => t.id === id);
     if (tx) {
-      const walletId = tx.walletId || (wallets.length > 0 ? wallets[0].id : null);
-      if (walletId) {
-        const updatedWallets = wallets.map(w => {
-          if (w.id === walletId) {
+      const walletId = tx.walletId;
+      setWallets(prevWallets => {
+        const activeWalletId = walletId || (prevWallets.length > 0 ? prevWallets[0].id : null);
+        if (!activeWalletId) return prevWallets;
+        
+        const updated = prevWallets.map(w => {
+          if (w.id === activeWalletId) {
             // Reverse transaction effect
             const change = tx.type === 'income' ? -tx.amount : tx.amount;
             return { ...w, balance: w.balance + change };
           }
           return w;
         });
-        setWallets(updatedWallets);
-        saveWallets(updatedWallets);
-      }
+        saveWallets(updated);
+        return updated;
+      });
     }
     
     deleteTransaction(id);
@@ -273,35 +294,40 @@ export default function App() {
   const handleUpdateTransaction = (tx) => {
     const oldTx = transactions.find(t => t.id === tx.id);
     if (oldTx) {
-      const oldWalletId = oldTx.walletId || (wallets.length > 0 ? wallets[0].id : null);
-      const newWalletId = tx.walletId || (wallets.length > 0 ? wallets[0].id : null);
+      const oldWalletId = oldTx.walletId;
+      const newWalletId = tx.walletId;
       
-      let updatedWallets = [...wallets];
-      
-      // Reverse old transaction
-      if (oldWalletId) {
-        updatedWallets = updatedWallets.map(w => {
-          if (w.id === oldWalletId) {
-            const change = oldTx.type === 'income' ? -oldTx.amount : oldTx.amount;
-            return { ...w, balance: w.balance + change };
-          }
-          return w;
-        });
-      }
-      
-      // Apply new transaction
-      if (newWalletId) {
-        updatedWallets = updatedWallets.map(w => {
-          if (w.id === newWalletId) {
-            const change = tx.type === 'income' ? tx.amount : -tx.amount;
-            return { ...w, balance: w.balance + change };
-          }
-          return w;
-        });
-      }
-      
-      setWallets(updatedWallets);
-      saveWallets(updatedWallets);
+      setWallets(prevWallets => {
+        const activeOldWalletId = oldWalletId || (prevWallets.length > 0 ? prevWallets[0].id : null);
+        const activeNewWalletId = newWalletId || (prevWallets.length > 0 ? prevWallets[0].id : null);
+        
+        let updated = [...prevWallets];
+        
+        // Reverse old transaction
+        if (activeOldWalletId) {
+          updated = updated.map(w => {
+            if (w.id === activeOldWalletId) {
+              const change = oldTx.type === 'income' ? -oldTx.amount : oldTx.amount;
+              return { ...w, balance: w.balance + change };
+            }
+            return w;
+          });
+        }
+        
+        // Apply new transaction
+        if (activeNewWalletId) {
+          updated = updated.map(w => {
+            if (w.id === activeNewWalletId) {
+              const change = tx.type === 'income' ? tx.amount : -tx.amount;
+              return { ...w, balance: w.balance + change };
+            }
+            return w;
+          });
+        }
+        
+        saveWallets(updated);
+        return updated;
+      });
     }
     
     updateTransaction(tx);
@@ -415,6 +441,8 @@ export default function App() {
     { id: 'savings', label: 'Tiết kiệm', icon: PiggyBank },
     { id: 'wallets', label: 'Ví & Tài khoản', icon: Wallet },
     { id: 'calculator', label: 'Công cụ tính toán', icon: Calculator },
+    { id: 'work-timer', label: 'Đếm giờ làm việc', icon: Timer },
+    { id: 'shopee-driver', label: 'Tài xế ShopeeFood', icon: Bike },
     { id: 'ai-assistant', label: 'Trợ lý AnhTuanAI', icon: Sparkles },
     { id: 'budget', label: 'Cấu hình & Bảo mật', icon: Settings },
     ...(userRole === 'admin' ? [{ id: 'accounts', label: 'Quản lý tài khoản', icon: Users }] : []),
@@ -512,12 +540,26 @@ export default function App() {
             onSaveApiKey={handleSaveApiKey}
             onClearUserData={handleClearUserData}
             userRole={userRole}
+            activeTheme={activeTheme}
+            onChangeTheme={setActiveTheme}
           />
         );
       case 'calculator':
         return (
           <FinancialCalculator 
             onNavigate={(tab) => setActiveTab(tab)}
+          />
+        );
+      case 'work-timer':
+        return (
+          <WorkTimer 
+            activeUser={activeUser}
+          />
+        );
+      case 'shopee-driver':
+        return (
+          <ShopeeFoodDriver 
+            activeUser={activeUser}
           />
         );
       case 'accounts':

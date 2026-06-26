@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Plus, Search, Filter, Trash2, ArrowUpRight, ArrowDownLeft, 
-  Calendar, FileText, Tag, Edit3, X, Check, RefreshCw, Sparkles
+  Calendar, FileText, Tag, Edit3, X, Check, RefreshCw, Sparkles, ArrowRightLeft,
+  Mic, MicOff
 } from 'lucide-react';
 import { getCategories, formatVND, formatNumberInput } from '../utils/storage';
 import { parseTransactionWithAI, getLocalDateString } from '../utils/aiParser';
@@ -19,13 +20,14 @@ export default function Transactions({
   const finalCategories = categories || getCategories();
   
   // Form State
-  const [type, setType] = useState('expense'); // 'income' or 'expense'
+  const [type, setType] = useState('expense'); // 'income', 'expense' or 'transfer'
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState(finalCategories.expense[0] || 'Khác');
   const [date, setDate] = useState(getLocalDateString(new Date()));
   const [note, setNote] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [walletId, setWalletId] = useState('');
+  const [targetWalletId, setTargetWalletId] = useState('');
   const [excludeFromStats, setExcludeFromStats] = useState(false);
   
   // AI Parsing State
@@ -33,6 +35,55 @@ export default function Transactions({
   const [aiInput, setAiInput] = useState('');
   const [isParsing, setIsParsing] = useState(false);
   const [parsedResult, setParsedResult] = useState(null);
+
+  // Voice Input State
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
+
+  const toggleListening = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Trình duyệt của bạn không hỗ trợ nhận diện giọng nói. Vui lòng dùng Google Chrome, Edge hoặc Safari!");
+      return;
+    }
+
+    if (isListening) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'vi-VN';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onerror = (event) => {
+      console.error(event.error);
+      setIsListening(false);
+      if (event.error === 'not-allowed') {
+        alert("Bạn chưa cấp quyền truy cập Microphone cho trang web. Vui lòng kiểm tra cài đặt trình duyệt!");
+      }
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setAiInput(prev => prev ? `${prev} ${transcript}` : transcript);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
 
   const handleAiParse = async () => {
     if (!aiInput.trim() || isParsing) return;
@@ -94,13 +145,19 @@ export default function Transactions({
       if (!isValid) {
         setWalletId(wallets[0].id);
       }
+      const isValidTarget = wallets.some(w => w.id === targetWalletId);
+      if (!isValidTarget) {
+        setTargetWalletId(wallets[1]?.id || wallets[0].id);
+      }
     }
-  }, [wallets, walletId]);
+  }, [wallets, walletId, targetWalletId]);
 
   // Handle Type Change in Form
   const handleTypeChange = (newType) => {
     setType(newType);
-    setCategory(newType === 'income' ? (finalCategories.income[0] || 'Khác') : (finalCategories.expense[0] || 'Khác'));
+    if (newType !== 'transfer') {
+      setCategory(newType === 'income' ? (finalCategories.income[0] || 'Khác') : (finalCategories.expense[0] || 'Khác'));
+    }
   };
 
   // Handle Form Submit (Add / Edit)
@@ -108,24 +165,70 @@ export default function Transactions({
     e.preventDefault();
     if (!amount || Number(amount) <= 0) return;
 
-    const txData = {
-      type,
-      amount: Number(amount),
-      category,
-      date,
-      note: note.trim(),
-      walletId: walletId || (wallets.length > 0 ? wallets[0].id : ''),
-      excludeFromStats
-    };
+    if (type === 'transfer') {
+      const sourceId = walletId || (wallets.length > 0 ? wallets[0].id : '');
+      const targetId = targetWalletId || (wallets.length > 1 ? wallets[1].id : (wallets.length > 0 ? wallets[0].id : ''));
+      
+      if (sourceId === targetId) {
+        alert('Ví nguồn và ví đích phải khác nhau!');
+        return;
+      }
 
-    if (editingId) {
-      onUpdateTransaction({
-        ...txData,
-        id: editingId
-      });
-      setEditingId(null);
+      const sourceWallet = wallets.find(w => w.id === sourceId);
+      const targetWallet = wallets.find(w => w.id === targetId);
+
+      const sourceName = sourceWallet ? sourceWallet.name : 'Nguồn';
+      const targetName = targetWallet ? targetWallet.name : 'Đích';
+
+      // 1. Transaction 1: Expense from source wallet
+      const txSource = {
+        type: 'expense',
+        amount: Number(amount),
+        category: 'Chuyển ví',
+        date,
+        note: note.trim() ? `${note.trim()} (Chuyển sang ${targetName})` : `Chuyển sang ${targetName}`,
+        walletId: sourceId,
+        excludeFromStats: true
+      };
+
+      // 2. Transaction 2: Income to target wallet
+      const txTarget = {
+        type: 'income',
+        amount: Number(amount),
+        category: 'Chuyển ví',
+        date,
+        note: note.trim() ? `${note.trim()} (Nhận từ ${sourceName})` : `Nhận từ ${sourceName}`,
+        walletId: targetId,
+        excludeFromStats: true
+      };
+
+      onAddTransaction(txSource);
+      // Timeout slightly to let database write properly without lock
+      setTimeout(() => {
+        onAddTransaction(txTarget);
+      }, 50);
+
+      alert('Đã ghi nhận chuyển ví thành công!');
     } else {
-      onAddTransaction(txData);
+      const txData = {
+        type,
+        amount: Number(amount),
+        category,
+        date,
+        note: note.trim(),
+        walletId: walletId || (wallets.length > 0 ? wallets[0].id : ''),
+        excludeFromStats
+      };
+
+      if (editingId) {
+        onUpdateTransaction({
+          ...txData,
+          id: editingId
+        });
+        setEditingId(null);
+      } else {
+        onAddTransaction(txData);
+      }
     }
 
     // Reset Form
@@ -292,14 +395,36 @@ export default function Transactions({
           {inputMode === 'ai' && !editingId ? (
             <div className="space-y-4 animate-slide-up">
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Mô tả giao dịch tự nhiên</label>
-                <textarea
-                  rows={3}
-                  value={aiInput}
-                  onChange={(e) => setAiInput(e.target.value)}
-                  placeholder="Ví dụ: hôm nay chạy shopeefood nhận được 100k tiền mặt được khách bo 5k"
-                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-medium resize-none scrollbar-none"
-                />
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Mô tả giao dịch tự nhiên</label>
+                  {isListening && (
+                    <span className="text-[10px] text-rose-450 font-bold animate-pulse flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping"></span>
+                      Đang nghe...
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <textarea
+                    rows={3}
+                    value={aiInput}
+                    onChange={(e) => setAiInput(e.target.value)}
+                    placeholder="Ví dụ: hôm nay chạy shopeefood nhận được 100k tiền mặt được khách bo 5k"
+                    className="w-full px-3.5 py-2.5 pr-12 rounded-xl glass-input text-xs font-medium resize-none scrollbar-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={toggleListening}
+                    className={`absolute right-3 bottom-3 p-2 rounded-xl transition duration-200 cursor-pointer flex items-center justify-center ${
+                      isListening
+                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30 shadow-[0_0_12px_rgba(244,63,94,0.35)] animate-pulse'
+                        : 'bg-slate-900/60 hover:bg-slate-800 text-purple-400 border border-slate-850 hover:text-purple-300'
+                    }`}
+                    title={isListening ? "Dừng ghi âm" : "Ghi âm giọng nói 🎙️"}
+                  >
+                    {isListening ? <MicOff className="w-4 h-4 text-rose-400" /> : <Mic className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
               <button
@@ -403,28 +528,39 @@ export default function Transactions({
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Type selector */}
-              <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1 rounded-xl border border-slate-900">
+              <div className="grid grid-cols-3 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-900">
                 <button
                   type="button"
                   onClick={() => handleTypeChange('expense')}
-                  className={`py-2 px-3 rounded-lg text-sm font-semibold transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                  className={`py-2 px-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1 ${
                     type === 'expense'
                       ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  <ArrowDownLeft className="w-4 h-4" /> Tiền ra (Chi)
+                  <ArrowDownLeft className="w-3.5 h-3.5" /> Tiền ra
                 </button>
                 <button
                   type="button"
                   onClick={() => handleTypeChange('income')}
-                  className={`py-2 px-3 rounded-lg text-sm font-semibold transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                  className={`py-2 px-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1 ${
                     type === 'income'
                       ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  <ArrowUpRight className="w-4 h-4" /> Tiền vào (Thu)
+                  <ArrowUpRight className="w-3.5 h-3.5" /> Tiền vào
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleTypeChange('transfer')}
+                  className={`py-2 px-1 rounded-lg text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1 ${
+                    type === 'transfer'
+                      ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30 shadow-[0_0_10px_-2px_rgba(168,85,247,0.3)]'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <ArrowRightLeft className="w-3.5 h-3.5" /> Chuyển ví
                 </button>
               </div>
 
@@ -444,7 +580,9 @@ export default function Transactions({
               {/* Wallet Selection */}
               {wallets && wallets.length > 0 && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Ví / Tài khoản</label>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                    {type === 'transfer' ? 'Từ ví (Nguồn)' : 'Ví / Tài khoản'}
+                  </label>
                   <select
                     value={walletId}
                     onChange={(e) => setWalletId(e.target.value)}
@@ -459,20 +597,40 @@ export default function Transactions({
                 </div>
               )}
 
+              {/* Target Wallet Selection for Transfers */}
+              {type === 'transfer' && wallets && wallets.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Đến ví (Đích)</label>
+                  <select
+                    value={targetWalletId}
+                    onChange={(e) => setTargetWalletId(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl glass-input text-sm"
+                  >
+                    {wallets.map(w => (
+                      <option key={w.id} value={w.id} className="bg-slate-900 text-slate-350">
+                        {w.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Category */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Danh mục</label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl glass-input text-sm"
-                >
-                  {type === 'expense' 
-                    ? finalCategories.expense.map(c => <option key={c} value={c} className="bg-slate-900 text-slate-350">{c}</option>)
-                    : finalCategories.income.map(c => <option key={c} value={c} className="bg-slate-900 text-slate-350">{c}</option>)
-                  }
-                </select>
-              </div>
+              {type !== 'transfer' && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Danh mục</label>
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl glass-input text-sm"
+                  >
+                    {type === 'expense' 
+                      ? finalCategories.expense.map(c => <option key={c} value={c} className="bg-slate-900 text-slate-350">{c}</option>)
+                      : finalCategories.income.map(c => <option key={c} value={c} className="bg-slate-900 text-slate-350">{c}</option>)
+                    }
+                  </select>
+                </div>
+              )}
 
               {/* Date */}
               <div>
@@ -499,23 +657,25 @@ export default function Transactions({
               </div>
 
               {/* Exclude From Stats Checkbox */}
-              <div className="flex flex-col gap-1 bg-slate-950/40 p-3 rounded-xl border border-slate-900/60">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="excludeFromStats"
-                    checked={excludeFromStats}
-                    onChange={(e) => setExcludeFromStats(e.target.checked)}
-                    className="w-4 h-4 rounded text-purple-650 border-slate-800 bg-slate-950 focus:ring-purple-500 cursor-pointer"
-                  />
-                  <label htmlFor="excludeFromStats" className="text-xs font-bold text-slate-200 cursor-pointer select-none">
-                    Không thống kê (Loại trừ)
-                  </label>
+              {type !== 'transfer' && (
+                <div className="flex flex-col gap-1 bg-slate-950/40 p-3 rounded-xl border border-slate-900/60">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="excludeFromStats"
+                      checked={excludeFromStats}
+                      onChange={(e) => setExcludeFromStats(e.target.checked)}
+                      className="w-4 h-4 rounded text-purple-650 border-slate-880 bg-slate-950 focus:ring-purple-500 cursor-pointer"
+                    />
+                    <label htmlFor="excludeFromStats" className="text-xs font-bold text-slate-200 cursor-pointer select-none">
+                      Không thống kê (Loại trừ)
+                    </label>
+                  </div>
+                  <p className="text-[10px] text-slate-500 leading-relaxed ml-6">
+                    Tiền trong ví vẫn được cộng/trừ bình thường, nhưng giao dịch sẽ không được tính vào tổng thu/chi và các biểu đồ phân tích.
+                  </p>
                 </div>
-                <p className="text-[10px] text-slate-500 leading-relaxed ml-6">
-                  Tiền trong ví vẫn được cộng/trừ bình thường, nhưng giao dịch sẽ không được tính vào tổng thu/chi và các biểu đồ phân tích.
-                </p>
-              </div>
+              )}
 
               {/* Action buttons */}
               <div className="flex gap-2 pt-2">
@@ -533,11 +693,15 @@ export default function Transactions({
                   className={`flex-1 py-2.5 rounded-xl text-white text-sm font-semibold transition cursor-pointer flex items-center justify-center gap-1.5 shadow-md ${
                     editingId
                       ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/10'
-                      : 'bg-purple-600 hover:bg-purple-500 shadow-purple-500/10'
+                      : 'bg-purple-650 hover:bg-purple-600 shadow-purple-500/10'
                   }`}
                 >
                   {editingId ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                  {editingId ? 'Cập nhật' : 'Thêm giao dịch'}
+                  {editingId 
+                    ? 'Cập nhật' 
+                    : type === 'transfer' 
+                    ? 'Thực hiện chuyển ví' 
+                    : 'Thêm giao dịch'}
                 </button>
               </div>
             </form>

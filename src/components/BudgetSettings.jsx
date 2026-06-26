@@ -1,9 +1,18 @@
 import React, { useState } from 'react';
 import { 
   Save, AlertTriangle, Info, ShieldCheck, Tag, RefreshCw, 
-  KeyRound, Trash2, Plus, Calendar, Eye, EyeOff, Lock
+  KeyRound, Trash2, Plus, Calendar, Eye, EyeOff, Lock,
+  Palette, Check
 } from 'lucide-react';
 import { formatVND, formatNumberInput, changeUserPassword } from '../utils/storage';
+
+const themes = [
+  { id: 'purple', name: 'Tím Huyền Ảo (Mặc định)', desc: 'Chủ đạo Cyber Neon Purple và Indigo quyến rũ.', primary: '#a855f7', secondary: '#6366f1' },
+  { id: 'green', name: 'Xanh Lục Bảo', desc: 'Chủ đạo Emerald Green và Sky Blue dịu mát.', primary: '#10b981', secondary: '#0ea5e9' },
+  { id: 'rose', name: 'Lửa Hồng', desc: 'Chủ đạo Rose Pink và Fuchsia cá tính, trẻ trung.', primary: '#f43f5e', secondary: '#d946ef' },
+  { id: 'blue', name: 'Xanh Đại Dương', desc: 'Chủ đạo Deep Blue và Cyan hiện đại, tươi sáng.', primary: '#3b82f6', secondary: '#06b6d4' },
+  { id: 'amber', name: 'Vàng Hổ Phách', desc: 'Chủ đạo Amber Gold và Orange ấm áp, năng động.', primary: '#f59e0b', secondary: '#f97316' }
+];
 
 export default function BudgetSettings({ 
   budget, 
@@ -18,7 +27,9 @@ export default function BudgetSettings({
   onClearUserData,
   geminiKey,
   onSaveApiKey,
-  userRole = 'user'
+  userRole = 'user',
+  activeTheme = 'purple',
+  onChangeTheme
 }) {
   const [activeSubTab, setActiveSubTab] = useState('budget'); // 'budget', 'categories', 'recurring', 'security'
   
@@ -210,7 +221,8 @@ export default function BudgetSettings({
     { id: 'budget', label: 'Hạn mức ngân sách', icon: ShieldCheck },
     { id: 'categories', label: 'Danh mục chi tiêu', icon: Tag },
     { id: 'recurring', label: 'Giao dịch định kỳ', icon: RefreshCw },
-    { id: 'security', label: 'Tài khoản & Bảo mật', icon: KeyRound }
+    { id: 'security', label: 'Tài khoản & Bảo mật', icon: KeyRound },
+    { id: 'theme', label: 'Màu sắc giao diện', icon: Palette }
   ];
 
   return (
@@ -743,6 +755,45 @@ export default function BudgetSettings({
                   </button>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* TAB 5: THEME SETTINGS */}
+          {activeSubTab === 'theme' && (
+            <div className="glass-panel p-6 rounded-2xl shadow-xl space-y-6">
+              <h3 className="text-lg font-bold text-purple-400 border-b border-slate-900 pb-3 flex items-center gap-2 font-heading">
+                <Palette className="w-5 h-5" /> Tùy Biến Màu Sắc Giao Diện
+              </h3>
+              <p className="text-xs text-slate-400">Chọn tông màu chủ đạo yêu thích của bạn cho toàn bộ website FinTrack.</p>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                {themes.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => onChangeTheme(t.id)}
+                    className={`p-4 rounded-2xl border transition-all duration-300 text-left relative flex items-center gap-3.5 group cursor-pointer ${
+                      activeTheme === t.id
+                        ? 'bg-purple-650/15 border-purple-555/40 shadow-lg shadow-purple-500/5'
+                        : 'bg-slate-950/45 border-slate-900 hover:border-slate-800'
+                    }`}
+                  >
+                    {/* Color dots preview */}
+                    <div className="flex gap-1.5 flex-shrink-0">
+                      <span className="w-4.5 h-4.5 rounded-full shadow-inner" style={{ backgroundColor: t.primary }}></span>
+                      <span className="w-4.5 h-4.5 rounded-full shadow-inner" style={{ backgroundColor: t.secondary }}></span>
+                    </div>
+                    <div className="min-w-0">
+                      <span className="font-bold text-slate-200 text-xs block group-hover:text-purple-400 transition">{t.name}</span>
+                      <span className="text-[10px] text-slate-500 mt-0.5 block">{t.desc}</span>
+                    </div>
+                    {activeTheme === t.id && (
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-purple-600/20 text-purple-400 border border-purple-500/20 flex items-center justify-center">
+                        <Check className="w-3 h-3" />
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
